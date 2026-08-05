@@ -1,0 +1,22 @@
+[Unit]
+Description=Raspberry Pi BLE OPSEC Sniffer & Motion Video Correlator
+After=network.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rpi-ble-opsec
+ExecStart=/opt/rpi-ble-opsec/rpi-portable-ble-opsec-sniffer --video-dir /opt/rpi-ble-opsec/storage/videos --db-path /opt/rpi-ble-opsec/storage/sniffer.db --http-port 8080
+Restart=always
+RestartSec=5s
+
+# Security Hardening
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

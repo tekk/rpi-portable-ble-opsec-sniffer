@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Connection Mode",
+        "description": "Choose whether Home Assistant connects via REST/WebSockets API or directly to your MQTT Broker.",
+        "data": {
+          "connection_type": "Connection Mode"
+        }
+      },
+      "rest": {
+        "title": "REST & WebSockets API Configuration",
+        "description": "Enter the host IP and HTTP port of your RPi BLE Sniffer.",
+        "data": {
+          "host": "Host IP Address",
+          "port": "HTTP API Port"
+        }
+      },
+      "mqtt": {
+        "title": "MQTT Broker Configuration",
+        "description": "Enter your MQTT Broker credentials and topic prefix.",
+        "data": {
+          "mqtt_host": "MQTT Broker Host",
+          "mqtt_port": "MQTT Broker Port",
+          "mqtt_topic": "MQTT Topic Prefix",
+          "mqtt_user": "MQTT Username (Optional)",
+          "mqtt_pass": "MQTT Password (Optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to host.",
+      "invalid_response": "Received invalid response from API.",
+      "unknown": "Unexpected error occurred."
+    }
+  }
+}

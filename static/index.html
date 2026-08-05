@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPi BLE OPSEC Sniffer & Motion Correlator</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Local Tailwind CSS v4 Runtime & Chart.js Loaded from Disk -->
+    <script src="js/tailwindcss-browser.js"></script>
+    <script src="js/chart.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex selection:bg-cyan-500 selection:text-slate-950">
+
+    <div class="flex w-full min-h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-72 bg-slate-900/90 border-r border-slate-800/80 p-5 flex flex-col justify-between shrink-0 backdrop-blur-xl">
+            <div>
+                <!-- Brand Header -->
+                <div class="flex items-center gap-3 mb-8 px-2">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-sky-500 to-blue-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
+                        📡
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wide bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">BLE OPSEC</h1>
+                        <span class="text-xs font-medium text-cyan-400 tracking-wider uppercase">RPi Sniffer & Correlator</span>
+                    </div>
+                </div>
+
+                <!-- Navigation Links -->
+                <nav class="space-y-1.5" id="nav-menu">
+                    <button class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800/60" data-tab="radar">
+                        <span class="text-lg">🎯</span> Live Radar & Sniffer
+                    </button>
+                    <button class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800/60" data-tab="videos">
+                        <span class="text-lg">🎥</span> Motion Videos & BLE
+                    </button>
+                    <button class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800/60" data-tab="devices">
+                        <span class="text-lg">📱</span> Device Inventory
+                    </button>
+                    <button class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800/60" data-tab="queries">
+                        <span class="text-lg">⚡</span> Query Studio (20+)
+                    </button>
+                    <button class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-300 hover:text-white hover:bg-slate-800/60" data-tab="settings">
+                        <span class="text-lg">⚙️</span> Settings & Storage
+                    </button>
+                </nav>
+            </div>
+
+            <!-- System Status Footer Widget -->
+            <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex items-center gap-3">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <div class="flex flex-col">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">System State</span>
+                    <span class="text-xs font-bold text-emerald-400" id="sys-status">Scanning 24/7 Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+            <!-- Top Appbar -->
+            <header class="flex justify-between items-center mb-8 bg-slate-900/50 p-4 px-6 rounded-2xl border border-slate-800/60 backdrop-blur-md shadow-xl">
+                <div>
+                    <h2 class="text-2xl font-bold tracking-tight text-white" id="current-tab-title">Live BLE Radar & Sniffer</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Real-time 24/7 promiscuous Bluetooth packet telemetry</p>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <button class="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/20 hover:brightness-110 transition-all flex items-center gap-2" id="btn-run-wizard">
+                        <span>🧙 Setup Wizard</span>
+                    </button>
+                    <button class="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-all shadow-md flex items-center gap-2" id="btn-update-oui">
+                        <span>🔄 Update OUI</span>
+                    </button>
+                    <div class="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 shadow-inner">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> WS LIVE
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB 1: Live Radar & Sniffer -->
+            <section id="tab-radar" class="tab-pane active space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Radar Sweep Canvas Card -->
+                    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col items-center">
+                        <div class="w-full flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                                <span>🎯 Proximity Radar</span>
+                            </h3>
+                            <span class="px-3 py-1 text-xs font-extrabold rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30" id="radar-count">0 Active Devices</span>
+                        </div>
+                        <div class="relative flex justify-center items-center p-2">
+                            <canvas id="radarCanvas" width="380" height="380" class="rounded-full shadow-2xl shadow-cyan-500/10 border border-cyan-500/30"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry Metrics Grid Card -->
+                    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-base text-slate-100">Sniffer Telemetry</h3>
+                            <span class="text-xs text-slate-400">Promiscuous Mode</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl flex flex-col items-center text-center">
+                                <span class="font-mono text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500" id="metric-total-pkts">0</span>
+                                <span class="text-xs text-slate-400 font-medium mt-1">Packets Logged</span>
+                            </div>
+                            <div class="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl flex flex-col items-center text-center">
+                                <span class="font-mono text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400" id="metric-total-devs">0</span>
+                                <span class="text-xs text-slate-400 font-medium mt-1">Unique MACs</span>
+                            </div>
+                            <div class="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl flex flex-col items-center text-center">
+                                <span class="font-mono text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-pink-500" id="metric-trackers">0</span>
+                                <span class="text-xs text-slate-400 font-medium mt-1">AirTags / Trackers</span>
+                            </div>
+                            <div class="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl flex flex-col items-center text-center">
+                                <span class="font-mono text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400" id="metric-esp32">0</span>
+                                <span class="text-xs text-slate-400 font-medium mt-1">ESP32 / nRF Nodes</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live BLE Packet Feed Table Card -->
+                <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-base text-slate-100">Live 24/7 Packet Stream</h3>
+                        <span class="text-xs text-slate-400">Click any MAC to inspect RSSI/Distance trend</span>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-96 overflow-y-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Timestamp</th>
+                                    <th class="p-3.5">Adapter</th>
+                                    <th class="p-3.5">MAC Address</th>
+                                    <th class="p-3.5">Type</th>
+                                    <th class="p-3.5">Inferred Device</th>
+                                    <th class="p-3.5">Vendor</th>
+                                    <th class="p-3.5">RSSI</th>
+                                    <th class="p-3.5">Raw Payload (EIR)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/50" id="tbody-packets">
+                                <tr><td colspan="8" class="p-6 text-center text-slate-500">Listening for BLE advertisement packets...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Motion Videos & Correlated BLE Timeline -->
+            <section id="tab-videos" class="tab-pane space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Synchronized Video Player Container -->
+                    <div class="lg:col-span-7 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col justify-between space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-base text-slate-100" id="video-player-title">Motion Clip Viewer (-10s / +10s Interleave)</h3>
+                            <span class="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-xs font-bold" id="video-current-sec-badge">Time: 0s</span>
+                        </div>
+                        <div class="bg-slate-950 rounded-xl overflow-hidden border border-slate-800 aspect-video flex items-center justify-center relative">
+                            <video id="motionVideoPlayer" class="w-full h-full object-cover">
+                                <source src="" type="video/mp4">
+                                Browser does not support video playback.
+                            </video>
+                        </div>
+                        
+                        <!-- Synchronized Video Playback Controls -->
+                        <div class="bg-slate-950/80 border border-slate-800/80 p-3 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <button id="vctrl-play" class="p-2 rounded-lg bg-cyan-500 text-slate-950 font-bold hover:brightness-110 transition-all text-xs">▶ Play</button>
+                                <button id="vctrl-pause" class="p-2 rounded-lg bg-slate-800 text-slate-200 font-bold hover:bg-slate-700 transition-all text-xs">⏸ Pause</button>
+                                <button id="vctrl-rewind" class="p-2 rounded-lg bg-slate-800 text-slate-200 font-bold hover:bg-slate-700 transition-all text-xs">⏪ -5s</button>
+                                <button id="vctrl-forward" class="p-2 rounded-lg bg-slate-800 text-slate-200 font-bold hover:bg-slate-700 transition-all text-xs">⏩ +5s</button>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button id="vctrl-prev-frame" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700">|◀ Frame</button>
+                                <button id="vctrl-next-frame" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700">Frame ▶|</button>
+                                <select id="vctrl-speed" class="bg-slate-900 border border-slate-800 text-cyan-400 text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none">
+                                    <option value="1.0">1x Speed</option>
+                                    <option value="2.0">2x Speed</option>
+                                    <option value="3.0">3x Speed</option>
+                                    <option value="4.0">4x Speed</option>
+                                    <option value="8.0">8x Speed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs text-slate-300 flex justify-between items-center">
+                            <span id="video-meta-time">Start: --</span>
+                            <span id="video-meta-duration">Duration: --</span>
+                            <span class="text-cyan-400 font-bold" id="video-meta-devices">Devices: --</span>
+                        </div>
+                    </div>
+
+                    <!-- Synchronized Live BLE Timeline List -->
+                    <div class="lg:col-span-5 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-base text-slate-100">Synchronized BLE Devices Timeline</h3>
+                        </div>
+                        <div class="space-y-2.5 overflow-y-auto max-h-[440px] pr-1" id="correlated-devices-list">
+                            <div class="text-slate-500 text-center py-12 text-xs">Select a video clip below to view synchronized BLE playback.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Recordings Table Card -->
+                <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-base text-slate-100">Recorded Motion Events Gallery</h3>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-96 overflow-y-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">Video File</th>
+                                    <th class="p-3.5">Motion Start</th>
+                                    <th class="p-3.5">Duration</th>
+                                    <th class="p-3.5">Trigger Score</th>
+                                    <th class="p-3.5">Correlated Devices</th>
+                                    <th class="p-3.5">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/50" id="tbody-videos">
+                                <tr><td colspan="6" class="p-6 text-center text-slate-500">Loading recorded motion clips...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: Device Inventory -->
+            <section id="tab-devices" class="tab-pane space-y-6 hidden">
+                <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-100">Classified Device Inventory</h3>
+                            <p class="text-xs text-slate-400">Click any device to open RSSI, SNR & Approaching/Receding Proximity Graph</p>
+                        </div>
+                        <input type="text" id="device-search-input" placeholder="Search by MAC, Vendor, or Type..." class="bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 w-72">
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-[500px] overflow-y-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3.5">MAC Address</th>
+                                    <th class="p-3.5">Address Type</th>
+                                    <th class="p-3.5">Inferred Type</th>
+                                    <th class="p-3.5">Vendor Name</th>
+                                    <th class="p-3.5">Last Name</th>
+                                    <th class="p-3.5">Max RSSI</th>
+                                    <th class="p-3.5">Packets</th>
+                                    <th class="p-3.5">Last Seen</th>
+                                    <th class="p-3.5">Proximity Graph</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/50" id="tbody-devices">
+                                <tr><td colspan="9" class="p-6 text-center text-slate-500">Loading device database...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: Query Studio -->
+            <section id="tab-queries" class="tab-pane space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Predefined Queries Sidebar -->
+                    <div class="lg:col-span-4 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col max-h-[650px]">
+                        <h3 class="font-bold text-base text-slate-100 mb-4">Predefined Queries (20+)</h3>
+                        <div class="space-y-2 overflow-y-auto pr-1 flex-1" id="query-selector-list">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+
+                    <!-- Query Workspace -->
+                    <div class="lg:col-span-8 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-base text-slate-100" id="query-title">SQL Query Editor</h3>
+                            <button class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 hover:brightness-110 transition-all" id="btn-run-query">
+                                ▶ Execute Query
+                            </button>
+                        </div>
+                        <div>
+                            <textarea id="sql-editor" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-cyan-400 focus:outline-none focus:border-cyan-500" placeholder="Enter custom SQL query..."></textarea>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <h4 class="font-bold text-sm text-slate-200">Query Output</h4>
+                            <span class="px-3 py-1 rounded-full bg-slate-800 text-xs font-bold text-slate-300" id="query-result-count">0 rows returned</span>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-72 overflow-y-auto">
+                            <table class="w-full text-left text-xs font-mono">
+                                <thead class="bg-slate-950 text-slate-400 sticky top-0 uppercase text-[11px] font-semibold border-b border-slate-800" id="thead-query"></thead>
+                                <tbody class="divide-y divide-slate-800/50" id="tbody-query">
+                                    <tr><td class="p-6 text-center text-slate-500">Select a query and click Execute.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: Settings & Storage -->
+            <section id="tab-settings" class="tab-pane space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- NAS Remote Storage & Auto-Backup Settings Card -->
+                    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl space-y-5">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                            <h3 class="font-bold text-lg text-slate-100">🌐 Remote NAS Offload (WebDAV/FTP/SFTP/SCP)</h3>
+                            <span class="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 font-bold text-xs" id="val-free-space">15.4 GB Free</span>
+                        </div>
+
+                        <div class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold" id="storage-space-alert">
+                            ⚠️ Disk space low! Auto-offload to NAS is active.
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase">Protocol:</label>
+                                <select id="nas-protocol-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-cyan-400">
+                                    <option value="SFTP">SFTP (SSH File Transfer)</option>
+                                    <option value="WebDAV">WebDAV (HTTP/HTTPS)</option>
+                                    <option value="FTP">FTP / FTPS</option>
+                                    <option value="SCP">SCP (Secure Copy)</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase">Port:</label>
+                                <input type="number" id="nas-port-input" value="22" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-400 uppercase">NAS Host / IP Address:</label>
+                            <input type="text" id="nas-host-input" value="192.168.1.100" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Username:</label>
+                            <input type="text" id="nas-user-input" value="nas_user" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Remote Target Path:</label>
+                            <input type="text" id="nas-path-input" value="/volume1/ble_opsec_backups" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                        </div>
+
+                        <div class="flex items-center gap-3 pt-2">
+                            <input type="checkbox" id="nas-auto-offload" checked class="w-4 h-4 accent-cyan-500 bg-slate-950 rounded">
+                            <label for="nas-auto-offload" class="text-xs text-slate-300 font-bold">Auto-offload recordings when disk space is low (<2GB)</label>
+                        </div>
+
+                        <button id="btn-save-nas" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 hover:brightness-110">
+                            💾 Save Remote NAS Storage Settings
+                        </button>
+                    </div>
+
+                    <!-- Backup Export & Restore Card -->
+                    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl flex flex-col justify-between space-y-6">
+                        <div class="space-y-4">
+                            <h3 class="font-bold text-lg text-slate-100 border-b border-slate-800 pb-3">📦 Data & Settings Backup/Restore</h3>
+                            <p class="text-xs text-slate-300">Export full database (devices, packets, video correlations) and system settings, or restore from a previously exported backup archive.</p>
+                            
+                            <div class="p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-3">
+                                <h4 class="font-bold text-xs text-cyan-400 uppercase">Export Backup Archive</h4>
+                                <button id="btn-export-backup" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all flex items-center gap-2">
+                                    <span>📥 Download Backup Archive (.json)</span>
+                                </button>
+                            </div>
+
+                            <div class="p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-3">
+                                <h4 class="font-bold text-xs text-cyan-400 uppercase">Restore System & Database</h4>
+                                <input type="file" id="file-restore-input" accept=".json" class="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-800">
+                            <button class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition-all shadow-md w-full" id="btn-force-oui">
+                                🔄 Download & Update IEEE OUI Database Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- First-Time Configuration Wizard Modal -->
+    <div id="setup-wizard-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-100">🧙 First-Time Setup Wizard</h3>
+                    <p class="text-xs text-slate-400">Configure camera hardware, Bluetooth adapters, and protection</p>
+                </div>
+                <button class="text-slate-400 hover:text-white font-extrabold text-xl px-2" onclick="window.wizard.closeWizard()">✕</button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                <div id="wizard-progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full w-1/4 transition-all duration-300"></div>
+            </div>
+
+            <!-- Step 1: Camera Hardware -->
+            <div id="wizard-step-1" class="space-y-4">
+                <h4 class="font-bold text-sm text-cyan-400">Step 1 of 4: Select Motion Camera Source</h4>
+                <p class="text-xs text-slate-300">Choose connected USB camera or Raspberry Pi CSI camera module:</p>
+                <select id="wizard-camera-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                    <option value="/dev/video0">/dev/video0 (V4L2 Camera)</option>
+                </select>
+            </div>
+
+            <!-- Step 2: BLE Adapter Source -->
+            <div id="wizard-step-2" class="space-y-4 hidden">
+                <h4 class="font-bold text-sm text-cyan-400">Step 2 of 4: Select Primary Bluetooth HCI Adapter</h4>
+                <p class="text-xs text-slate-300">Select Sena UD-100 dongle or Raspberry Pi internal Bluetooth adapter:</p>
+                <select id="wizard-hci-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                    <option value="hci0">hci0 (RPi 5 Broadcom BT)</option>
+                    <option value="hci1">hci1 (Sena UD-100 CSR Dongle)</option>
+                </select>
+            </div>
+
+            <!-- Step 3: Security & Protection -->
+            <div id="wizard-step-3" class="space-y-4 hidden">
+                <h4 class="font-bold text-sm text-cyan-400">Step 3 of 4: Web UI Access Protection</h4>
+                <p class="text-xs text-slate-300">Set optional admin password to protect sniffer web dashboard:</p>
+                <input type="password" id="wizard-password-input" placeholder="Leave empty for open local access..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <!-- Step 4: Storage & Sensitivity -->
+            <div id="wizard-step-4" class="space-y-4 hidden">
+                <h4 class="font-bold text-sm text-cyan-400">Step 4 of 4: Circular Interleave & Sensitivity</h4>
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-300">Motion Trigger Sensitivity Score (5 = High, 30 = Low):</label>
+                    <input type="range" min="5" max="30" value="15" id="wizard-sensitivity-input" class="w-full accent-cyan-500">
+                </div>
+            </div>
+
+            <!-- Wizard Footer Buttons -->
+            <div class="flex justify-between items-center pt-4 border-t border-slate-800">
+                <button class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700" onclick="window.wizard.prevStep()">Back</button>
+                <button class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 hover:brightness-110" onclick="window.wizard.nextStep()">Next Step →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proximity & Distance Analytics Modal -->
+    <div id="chart-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-100" id="chart-modal-title">Proximity & Distance Analytics</h3>
+                    <p class="text-xs text-slate-400">Path Loss Distance Model: d = 10^((TxPower - RSSI) / (10 * n))</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-xs font-bold" id="chart-trend-badge">Calculating...</span>
+                    <span class="px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold" id="chart-distance-val">-- m</span>
+                    <button class="text-slate-400 hover:text-white font-extrabold text-xl px-2" id="chart-modal-close">✕</button>
+                </div>
+            </div>
+            
+            <div class="h-80 w-full relative">
+                <canvas id="rssiHistoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/ble_radar.js"></script>
+    <script src="js/video_player.js"></script>
+    <script src="js/query_studio.js"></script>
+    <script src="js/device_charts.js"></script>
+    <script src="js/wizard.js"></script>
+    <script src="js/storage_backup.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

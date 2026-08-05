@@ -1,0 +1,11 @@
+{
+  "domain": "rpi_ble_opsec",
+  "name": "Raspberry Pi BLE OPSEC Sniffer",
+  "codeowners": ["@antigravity"],
+  "config_flow": true,
+  "documentation": "https://github.com/tekk/rpi-portable-ble-opsec-sniffer",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/tekk/rpi-portable-ble-opsec-sniffer/issues",
+  "requirements": ["aiohttp>=3.8.0"],
+  "version": "1.0.0"
+}

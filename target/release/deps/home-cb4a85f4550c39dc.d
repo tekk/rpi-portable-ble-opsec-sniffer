@@ -1,0 +1,8 @@
+/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/release/deps/home-cb4a85f4550c39dc.d: /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/lib.rs /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/env.rs
+
+/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/release/deps/libhome-cb4a85f4550c39dc.rlib: /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/lib.rs /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/env.rs
+
+/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/release/deps/libhome-cb4a85f4550c39dc.rmeta: /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/lib.rs /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/env.rs
+
+/home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/lib.rs:
+/home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/home-0.5.12/src/env.rs:

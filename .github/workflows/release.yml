@@ -1,0 +1,79 @@
+name: Automated Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-binaries:
+    name: Build Release Assets (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            asset_name: rpi-ble-opsec-linux-x64.tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            asset_name: rpi-ble-opsec-windows-x64.zip
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            use-cross: true
+            asset_name: rpi-ble-opsec-rpi-aarch64.tar.gz
+          - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            use-cross: true
+            asset_name: rpi-ble-opsec-rpi-armv7.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Cross
+        if: matrix.use-cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build Binary
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Package Binary Asset (Linux / RPi)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p stage
+          cp target/${{ matrix.target }}/release/rpi-portable-ble-opsec-sniffer stage/
+          cp -r static stage/
+          cp rpi-ble-opsec.service install-service.sh stage/ 2>/dev/null || true
+          cd stage
+          tar -czvf ../${{ matrix.asset_name }} *
+        shell: bash
+
+      - name: Package Binary Asset (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir stage
+          copy target\${{ matrix.target }}\release\rpi-portable-ble-opsec-sniffer.exe stage\
+          xcopy /E /I static stage\static
+          compress-archive -Path stage\* -DestinationPath ${{ matrix.asset_name }}
+        shell: powershell
+
+      - name: Upload Asset to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

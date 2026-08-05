@@ -1,0 +1,48 @@
+[package]
+name = "rpi-portable-ble-opsec-sniffer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Antigravity Developer <dev@antigravity.ai>"]
+description = "Raspberry Pi 24/7 BLE Sniffer, Camera Motion Correlator & Remote Web UI"
+
+[dependencies]
+# Async runtime & Web server
+tokio = { version = "1.38", features = ["full"] }
+axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+futures-util = "0.3"
+rust-embed = { version = "8.4", features = ["interpolate-folder-path"] }
+mime_guess = "2.0"
+
+# MQTT Client
+rumqttc = "0.24"
+
+# Serialization & Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1.6"
+rand = "0.8"
+hex = "0.4"
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+
+# HTTP client for downloading OUI database
+reqwest = { version = "0.12", features = ["json"] }
+
+# Image processing & V4L2 for camera motion detection
+image = "0.25"
+v4l = "0.14"
+
+# Logging & Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
