@@ -1,6 +1,0 @@
-/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/debug/deps/percent_encoding-9a7aae3400e50d13.d: /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/lib.rs /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/ascii_set.rs
-
-/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/debug/deps/libpercent_encoding-9a7aae3400e50d13.rmeta: /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/lib.rs /home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/ascii_set.rs
-
-/home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/lib.rs:
-/home/tekk/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/percent-encoding-2.3.2/src/ascii_set.rs:

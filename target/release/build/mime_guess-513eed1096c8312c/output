@@ -1,1 +1,0 @@
-cargo:rustc-env=MIME_TYPES_GENERATED_PATH=/home/tekk/dev/rpi-portable-ble-opsec-sniffer/target/release/build/mime_guess-513eed1096c8312c/out/mime_types_generated.rs
