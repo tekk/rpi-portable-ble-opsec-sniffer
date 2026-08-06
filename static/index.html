@@ -400,59 +400,123 @@
 
     <!-- First-Time Configuration Wizard Modal -->
     <div id="setup-wizard-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-4">
                 <div>
-                    <h3 class="font-bold text-lg text-slate-100">🧙 First-Time Setup Wizard</h3>
-                    <p class="text-xs text-slate-400">Configure camera hardware, Bluetooth adapters, and protection</p>
+                    <h3 class="font-bold text-lg text-slate-100">🧙 First-Time Master Setup Wizard</h3>
+                    <p class="text-xs text-slate-400">Configure camera hardware, Bluetooth adapters, NAS, security & MQTT</p>
                 </div>
                 <button class="text-slate-400 hover:text-white font-extrabold text-xl px-2" onclick="window.wizard.closeWizard()">✕</button>
             </div>
 
             <!-- Progress Bar -->
             <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
-                <div id="wizard-progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full w-1/4 transition-all duration-300"></div>
+                <div id="wizard-progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full w-1/5 transition-all duration-300"></div>
             </div>
 
-            <!-- Step 1: Camera Hardware -->
+            <!-- Step 1: Camera Hardware & Master Toggle -->
             <div id="wizard-step-1" class="space-y-4">
-                <h4 class="font-bold text-sm text-cyan-400">Step 1 of 4: Select Motion Camera Source</h4>
-                <p class="text-xs text-slate-300">Choose connected USB camera or Raspberry Pi CSI camera module:</p>
-                <select id="wizard-camera-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
-                    <option value="/dev/video0">/dev/video0 (V4L2 Camera)</option>
-                </select>
+                <h4 class="font-bold text-sm text-cyan-400">Step 1 of 5: Camera Hardware & Recording</h4>
+                <div class="flex items-center gap-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <input type="checkbox" id="wizard-camera-enable-toggle" checked class="w-4 h-4 accent-cyan-500 bg-slate-950 rounded">
+                    <label for="wizard-camera-enable-toggle" class="text-xs font-bold text-slate-200">Enable Motion Video Recording & Camera Capture</label>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-300">Connected V4L2 Camera Device Source:</label>
+                    <select id="wizard-camera-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                        <option value="/dev/video0">/dev/video0 (V4L2 Camera)</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-300">Motion Sensitivity Trigger Score (5 = High, 30 = Low):</label>
+                    <input type="range" min="5" max="30" value="15" id="wizard-sensitivity-input" class="w-full accent-cyan-500">
+                </div>
             </div>
 
-            <!-- Step 2: BLE Adapter Source -->
+            <!-- Step 2: BLE Adapter & Sniffing -->
             <div id="wizard-step-2" class="space-y-4 hidden">
-                <h4 class="font-bold text-sm text-cyan-400">Step 2 of 4: Select Primary Bluetooth HCI Adapter</h4>
-                <p class="text-xs text-slate-300">Select Sena UD-100 dongle or Raspberry Pi internal Bluetooth adapter:</p>
-                <select id="wizard-hci-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
-                    <option value="hci0">hci0 (RPi 5 Broadcom BT)</option>
-                    <option value="hci1">hci1 (Sena UD-100 CSR Dongle)</option>
-                </select>
+                <h4 class="font-bold text-sm text-cyan-400">Step 2 of 5: Bluetooth HCI Adapters & OUI Fingerprinting</h4>
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-300">Primary Bluetooth HCI Adapter:</label>
+                    <select id="wizard-hci-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                        <option value="hci0">hci0 (RPi 5 Broadcom BT)</option>
+                        <option value="hci1">hci1 (Sena UD-100 CSR Dongle)</option>
+                    </select>
+                </div>
+                <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-300">
+                    Auto-downloads IEEE vendor OUI database and multi-layer payload fingerprinting rules for iPhone, AirTag, Android, ESP32, nRF, Smartwatch, TV, and 15+ device types.
+                </div>
             </div>
 
-            <!-- Step 3: Security & Protection -->
+            <!-- Step 3: Security & Web Protection -->
             <div id="wizard-step-3" class="space-y-4 hidden">
-                <h4 class="font-bold text-sm text-cyan-400">Step 3 of 4: Web UI Access Protection</h4>
+                <h4 class="font-bold text-sm text-cyan-400">Step 3 of 5: Web UI Security & Protection</h4>
                 <p class="text-xs text-slate-300">Set optional admin password to protect sniffer web dashboard:</p>
                 <input type="password" id="wizard-password-input" placeholder="Leave empty for open local access..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
             </div>
 
-            <!-- Step 4: Storage & Sensitivity -->
+            <!-- Step 4: Remote NAS Storage & Auto-Backup -->
             <div id="wizard-step-4" class="space-y-4 hidden">
-                <h4 class="font-bold text-sm text-cyan-400">Step 4 of 4: Circular Interleave & Sensitivity</h4>
-                <div class="space-y-2">
-                    <label class="text-xs text-slate-300">Motion Trigger Sensitivity Score (5 = High, 30 = Low):</label>
-                    <input type="range" min="5" max="30" value="15" id="wizard-sensitivity-input" class="w-full accent-cyan-500">
+                <h4 class="font-bold text-sm text-cyan-400">Step 4 of 5: Remote NAS Storage & Auto-Backup Protocol</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-400">Protocol:</label>
+                        <select id="wizard-nas-protocol" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-cyan-400">
+                            <option value="SFTP">SFTP (SSH File Transfer)</option>
+                            <option value="WebDAV">WebDAV (HTTP/HTTPS)</option>
+                            <option value="FTP">FTP / FTPS</option>
+                            <option value="SCP">SCP (Secure Copy)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-400">Port:</label>
+                        <input type="number" id="wizard-nas-port" value="22" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-slate-400">NAS Host / IP Address:</label>
+                    <input type="text" id="wizard-nas-host" placeholder="192.168.1.100 (Optional)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-slate-400">Username & Path:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="text" id="wizard-nas-user" placeholder="nas_user" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                        <input type="text" id="wizard-nas-path" placeholder="/volume1/ble_backups" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="wizard-nas-auto-offload" checked class="w-4 h-4 accent-cyan-500 bg-slate-950 rounded">
+                    <label for="wizard-nas-auto-offload" class="text-xs text-slate-300 font-bold">Auto-offload recordings when free space &lt; 2GB</label>
+                </div>
+            </div>
+
+            <!-- Step 5: Home Assistant & MQTT -->
+            <div id="wizard-step-5" class="space-y-4 hidden">
+                <h4 class="font-bold text-sm text-cyan-400">Step 5 of 5: Home Assistant Integration & MQTT</h4>
+                <div class="flex items-center gap-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <input type="checkbox" id="wizard-mqtt-enable" class="w-4 h-4 accent-cyan-500 bg-slate-950 rounded">
+                    <label for="wizard-mqtt-enable" class="text-xs font-bold text-slate-200">Enable MQTT Auto-Discovery for Home Assistant</label>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="text-[11px] font-bold text-slate-400">MQTT Host:</label>
+                        <input type="text" id="wizard-mqtt-host" value="localhost" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-400">Port:</label>
+                        <input type="number" id="wizard-mqtt-port" value="1883" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400">MQTT Topic Prefix:</label>
+                    <input type="text" id="wizard-mqtt-topic" value="homeassistant/rpi_ble_opsec" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200">
                 </div>
             </div>
 
             <!-- Wizard Footer Buttons -->
             <div class="flex justify-between items-center pt-4 border-t border-slate-800">
                 <button class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700" onclick="window.wizard.prevStep()">Back</button>
-                <button class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 hover:brightness-110" onclick="window.wizard.nextStep()">Next Step →</button>
+                <button id="wizard-btn-next" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 hover:brightness-110" onclick="window.wizard.nextStep()">Next Step →</button>
             </div>
         </div>
     </div>
