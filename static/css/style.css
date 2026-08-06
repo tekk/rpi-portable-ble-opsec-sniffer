@@ -1,3 +1,26 @@
+/* Meslo Condensed Locally Downloaded UI Font */
+@font-face {
+    font-family: 'Meslo Condensed';
+    src: url('../fonts/Meslo-Condensed-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Meslo Condensed';
+    src: url('../fonts/Meslo-Condensed-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+* {
+    font-family: 'Meslo Condensed', 'Meslo LG S', monospace, sans-serif;
+}
+
+body, html, button, input, select, textarea, .font-sans, .font-mono {
+    font-family: 'Meslo Condensed', 'Meslo LG S', monospace, sans-serif !important;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;
