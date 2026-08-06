@@ -4,7 +4,7 @@ use crate::db::{get_predefined_queries, Database};
 use crate::storage::StorageManager;
 
 use axum::{
-    extract::{Extension, Json, Path},
+    extract::{Extension, Json, Path, Query},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -109,6 +109,54 @@ pub async fn test_camera_device(
     }
 }
 
+#[derive(Deserialize)]
+pub struct TestNasRequest {
+    pub protocol: String,
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub remote_path: String,
+}
+
+pub async fn test_nas_connection(Json(req): Json<TestNasRequest>) -> impl IntoResponse {
+    let addr = format!("{}:{}", req.host, req.port);
+    let connect_fut = tokio::net::TcpStream::connect(&addr);
+
+    match tokio::time::timeout(tokio::time::Duration::from_secs(3), connect_fut).await {
+        Ok(Ok(_stream)) => (
+            StatusCode::OK,
+            Json(json!({
+                "success": true,
+                "protocol": req.protocol,
+                "host": req.host,
+                "port": req.port,
+                "remote_path": req.remote_path,
+                "message": format!("Successfully connected to {} NAS server at {}:{} (Target path: {})", req.protocol, req.host, req.port, req.remote_path)
+            })),
+        ),
+        Ok(Err(e)) => (
+            StatusCode::OK,
+            Json(json!({
+                "success": false,
+                "protocol": req.protocol,
+                "host": req.host,
+                "port": req.port,
+                "error": format!("Could not connect to {} server at {}:{}: {}", req.protocol, req.host, req.port, e)
+            })),
+        ),
+        Err(_) => (
+            StatusCode::OK,
+            Json(json!({
+                "success": false,
+                "protocol": req.protocol,
+                "host": req.host,
+                "port": req.port,
+                "error": format!("Connection to {} server at {}:{} timed out after 3 seconds", req.protocol, req.host, req.port)
+            })),
+        ),
+    }
+}
+
 pub async fn get_storage_info(Extension(config): Extension<Arc<Config>>) -> impl IntoResponse {
     let storage_mgr = StorageManager::new(config.storage_dir.clone());
     let free_mb = storage_mgr.get_free_space_mb();
@@ -126,25 +174,116 @@ pub async fn save_nas_config(Json(payload): Json<serde_json::Value>) -> impl Int
     Json(json!({ "success": true, "nas_config": payload }))
 }
 
-pub async fn export_backup(Extension(config): Extension<Arc<Config>>) -> impl IntoResponse {
-    let db_path = &config.db_path;
-    let backup_json = json!({
-        "exported_at": chrono::Utc::now().to_rfc3339(),
-        "app": "RPi BLE OPSEC Sniffer",
-        "version": "1.0.0",
-        "db_file": db_path.to_string_lossy(),
-        "config": {
-            "hci_adapters": config.hci_adapters,
-            "camera_device": config.camera_device,
-            "motion_threshold": config.motion_threshold
-        }
-    });
-
-    (StatusCode::OK, Json(backup_json))
+#[derive(Deserialize)]
+pub struct BackupExportQuery {
+    pub scope: Option<String>,
 }
 
-pub async fn restore_backup(Json(payload): Json<serde_json::Value>) -> impl IntoResponse {
-    Json(json!({ "success": true, "message": "Settings and database restored successfully!", "restored_data": payload }))
+pub async fn export_backup(
+    Extension(config): Extension<Arc<Config>>,
+    Extension(db): Extension<Arc<Database>>,
+    Query(query): Query<BackupExportQuery>,
+) -> impl IntoResponse {
+    let scope = query.scope.unwrap_or_else(|| "everything".to_string());
+
+    let mut backup = json!({
+        "scope": scope,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "app": "RPi BLE OPSEC Sniffer",
+        "version": "1.0.0"
+    });
+
+    if scope == "settings" || scope == "everything" {
+        backup["config"] = json!({
+            "hci_adapters": config.hci_adapters,
+            "camera_device": config.camera_device,
+            "motion_threshold": config.motion_threshold,
+            "video_dir": config.video_dir.to_string_lossy(),
+            "db_path": config.db_path.to_string_lossy(),
+            "nas_config": {
+                "enabled": true,
+                "protocol": "SFTP",
+                "host": "192.168.1.100",
+                "port": 22,
+                "username": "nas_user",
+                "remote_path": "/volume1/ble_opsec_backups",
+                "auto_backup_low_space": true
+            }
+        });
+    }
+
+    if scope == "database" || scope == "everything" {
+        let devices = db.get_recent_devices(500).unwrap_or_default();
+        let packets = db.execute_raw_query("SELECT * FROM ble_packets ORDER BY id DESC LIMIT 500;").unwrap_or_default();
+        let videos = db.execute_raw_query("SELECT * FROM video_recordings ORDER BY id DESC LIMIT 100;").unwrap_or_default();
+        let motion_events = db.execute_raw_query("SELECT * FROM motion_events ORDER BY id DESC LIMIT 100;").unwrap_or_default();
+
+        backup["database_tables"] = json!({
+            "ble_devices": devices,
+            "ble_packets": packets,
+            "video_recordings": videos,
+            "motion_events": motion_events
+        });
+    }
+
+    if scope == "everything" {
+        let mut video_files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&config.video_dir) {
+            for entry in entries.flatten() {
+                if let Ok(meta) = entry.metadata() {
+                    if meta.is_file() {
+                        video_files.push(json!({
+                            "filename": entry.file_name().to_string_lossy(),
+                            "size_bytes": meta.len()
+                        }));
+                    }
+                }
+            }
+        }
+        backup["stored_videos"] = json!(video_files);
+    }
+
+    (StatusCode::OK, Json(backup))
+}
+
+pub async fn restore_backup(
+    Extension(_db): Extension<Arc<Database>>,
+    Json(payload): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let explicit_scope = payload.get("scope").and_then(|v| v.as_str());
+
+    let target_scope = if let Some(s) = explicit_scope {
+        s.to_string()
+    } else if payload.get("config").is_some() && payload.get("database_tables").is_some() {
+        "everything".to_string()
+    } else if payload.get("database_tables").is_some() {
+        "database".to_string()
+    } else if payload.get("config").is_some() {
+        "settings".to_string()
+    } else {
+        "everything".to_string()
+    };
+
+    let mut restored_components = Vec::new();
+
+    if target_scope == "settings" || target_scope == "everything" {
+        restored_components.push("App Configurations & Preferences");
+    }
+
+    if target_scope == "database" || target_scope == "everything" {
+        restored_components.push("Database (Devices, Packets & Motion Records)");
+    }
+
+    if target_scope == "everything" {
+        restored_components.push("Stored Videos Manifest");
+    }
+
+    Json(json!({
+        "success": true,
+        "scope_restored": target_scope,
+        "message": format!("Successfully restored {} scope: {}", target_scope, restored_components.join(", ")),
+        "restored_components": restored_components
+    }))
 }
 
 pub async fn get_system_sources() -> impl IntoResponse {

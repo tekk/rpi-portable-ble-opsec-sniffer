@@ -29,6 +29,16 @@ class SetupWizard {
         // Setup Camera Video Output Test Button
         this.setupCameraTest();
 
+        // Setup Wizard NAS Connection Test Button
+        const wizardBtnTestNas = document.getElementById('wizard-btn-test-nas');
+        if (wizardBtnTestNas) {
+            wizardBtnTestNas.addEventListener('click', () => {
+                if (window.storageManager) {
+                    window.storageManager.testNasConnection('wizard');
+                }
+            });
+        }
+
         if (!localStorage.getItem('wizard_completed')) {
             setTimeout(() => this.showWizard(), 1000);
         }
