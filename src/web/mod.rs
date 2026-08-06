@@ -22,6 +22,7 @@ pub async fn start_web_server(
     config: Arc<Config>,
     db: Arc<Database>,
     classifier: Arc<DeviceClassifier>,
+    camera_flag: Arc<std::sync::atomic::AtomicBool>,
     tx: broadcast::Sender<String>,
 ) -> Result<()> {
     let cors = CorsLayer::new()
@@ -33,6 +34,8 @@ pub async fn start_web_server(
         .route("/api/status", get(routes::get_status))
         .route("/api/system/sources", get(routes::get_system_sources))
         .route("/api/system/config", post(routes::save_system_config))
+        .route("/api/system/camera/status", get(routes::get_camera_status))
+        .route("/api/system/camera/toggle", post(routes::toggle_camera))
         .route("/api/system/storage/space", get(routes::get_storage_info))
         .route("/api/system/nas/config", post(routes::save_nas_config))
         .route("/api/backup/export", get(routes::export_backup))
@@ -51,6 +54,7 @@ pub async fn start_web_server(
         .layer(Extension(config.clone()))
         .layer(Extension(db))
         .layer(Extension(classifier))
+        .layer(Extension(camera_flag))
         .layer(Extension(tx));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.http_port));

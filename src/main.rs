@@ -87,13 +87,16 @@ async fn main() -> Result<()> {
         }
     });
 
-    // 9. Spawn Camera Motion Detector & Video Correlator Task
+    // 9. Camera Enabled Flag (Dynamic GUI Toggle & CLI --no-camera flag)
+    let camera_enabled_flag = Arc::new(std::sync::atomic::AtomicBool::new(config.camera_enabled));
+
     if config.camera_enabled {
         let camera_mgr = CameraManager::new(
             &config.camera_device,
             config.video_dir.clone(),
             config.motion_threshold,
             database.clone(),
+            camera_enabled_flag.clone(),
         );
         tokio::spawn(async move {
             if let Err(e) = camera_mgr.start_capture_loop().await {
@@ -103,7 +106,7 @@ async fn main() -> Result<()> {
     }
 
     // 10. Start Axum Web Server & WebSockets Endpoint
-    web::start_web_server(config, database, classifier, ws_tx).await?;
+    web::start_web_server(config, database, classifier, camera_enabled_flag, ws_tx).await?;
 
     Ok(())
 }

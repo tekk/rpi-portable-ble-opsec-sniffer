@@ -49,6 +49,7 @@ impl PreRollRingBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn clear(&self) {
         if let Ok(mut lock) = self.frames.lock() {
             lock.clear();

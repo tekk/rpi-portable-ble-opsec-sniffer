@@ -22,14 +22,38 @@ pub struct StatusResponse {
     pub version: &'static str,
 }
 
-pub async fn get_status(Extension(config): Extension<Arc<Config>>) -> impl IntoResponse {
+pub async fn get_status(
+    Extension(config): Extension<Arc<Config>>,
+    Extension(camera_flag): Extension<Arc<std::sync::atomic::AtomicBool>>,
+) -> impl IntoResponse {
+    let camera_active = camera_flag.load(std::sync::atomic::Ordering::Relaxed);
     Json(StatusResponse {
         status: "Online - 24/7 Scanning Active",
         active_adapters: config.hci_adapters.clone(),
-        camera_enabled: config.camera_enabled,
+        camera_enabled: camera_active,
         db_path: config.db_path.to_string_lossy().to_string(),
         version: "1.0.0",
     })
+}
+
+#[derive(Deserialize)]
+pub struct CameraToggleRequest {
+    pub enabled: bool,
+}
+
+pub async fn get_camera_status(
+    Extension(camera_flag): Extension<Arc<std::sync::atomic::AtomicBool>>,
+) -> impl IntoResponse {
+    let enabled = camera_flag.load(std::sync::atomic::Ordering::Relaxed);
+    Json(json!({ "camera_enabled": enabled }))
+}
+
+pub async fn toggle_camera(
+    Extension(camera_flag): Extension<Arc<std::sync::atomic::AtomicBool>>,
+    Json(req): Json<CameraToggleRequest>,
+) -> impl IntoResponse {
+    camera_flag.store(req.enabled, std::sync::atomic::Ordering::Relaxed);
+    Json(json!({ "camera_enabled": req.enabled }))
 }
 
 pub async fn get_storage_info(Extension(config): Extension<Arc<Config>>) -> impl IntoResponse {

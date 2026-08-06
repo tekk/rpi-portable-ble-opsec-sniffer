@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.wizard = new window.SetupWizard();
     window.storageManager = new window.StorageBackupManager();
 
+    // Camera Toggle Button Setup
+    setupCameraToggle();
+
     // Tab Navigation Handler
     const navItems = document.querySelectorAll('.nav-item');
     const tabPanes = document.querySelectorAll('.tab-pane');
@@ -283,3 +286,50 @@ function filterDevicesTable(query) {
     );
     renderDevicesTable(filtered);
 }
+
+let isCameraActive = true;
+
+async function setupCameraToggle() {
+    const btnToggle = document.getElementById('btn-toggle-camera');
+    const indicator = document.getElementById('camera-status-indicator');
+    const text = document.getElementById('camera-status-text');
+
+    if (!btnToggle) return;
+
+    const updateCameraUI = (enabled) => {
+        isCameraActive = enabled;
+        if (enabled) {
+            indicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+            text.textContent = "📷 Camera Active";
+            btnToggle.className = "px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition-all flex items-center gap-2";
+        } else {
+            indicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+            text.textContent = "📷 Camera Disabled";
+            btnToggle.className = "px-3.5 py-2 text-xs font-bold rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition-all flex items-center gap-2";
+        }
+    };
+
+    try {
+        const resp = await fetch('/api/system/camera/status');
+        const data = await resp.json();
+        updateCameraUI(data.camera_enabled);
+    } catch (e) {
+        console.error("Failed to fetch camera status:", e);
+    }
+
+    btnToggle.addEventListener('click', async () => {
+        const newState = !isCameraActive;
+        try {
+            const resp = await fetch('/api/system/camera/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newState })
+            });
+            const data = await resp.json();
+            updateCameraUI(data.camera_enabled);
+        } catch (e) {
+            alert(`Failed to toggle camera: ${e.message}`);
+        }
+    });
+}
+

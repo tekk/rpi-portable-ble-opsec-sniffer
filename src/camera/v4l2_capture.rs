@@ -7,6 +7,7 @@ use chrono::Utc;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -17,6 +18,7 @@ pub struct CameraManager {
     video_dir: PathBuf,
     motion_threshold: f64,
     db: Arc<Database>,
+    recording_enabled: Arc<AtomicBool>,
 }
 
 impl CameraManager {
@@ -25,12 +27,14 @@ impl CameraManager {
         video_dir: PathBuf,
         motion_threshold: f64,
         db: Arc<Database>,
+        recording_enabled: Arc<AtomicBool>,
     ) -> Self {
         Self {
             device_path: device_path.to_string(),
             video_dir,
             motion_threshold,
             db,
+            recording_enabled,
         }
     }
 
@@ -50,6 +54,16 @@ impl CameraManager {
         let mut frame_counter: u64 = 0;
 
         loop {
+            // Check dynamic GUI camera toggle state
+            if !self.recording_enabled.load(Ordering::Relaxed) {
+                if is_recording {
+                    is_recording = false;
+                    recording_frames.clear();
+                }
+                sleep(Duration::from_millis(1000)).await;
+                continue;
+            }
+
             frame_counter += 1;
             let now_instant = Instant::now();
             let now_utc = Utc::now();
@@ -63,23 +77,19 @@ impl CameraManager {
                 epoch_secs: now_utc.timestamp(),
                 width: 640,
                 height: 480,
-                data: dummy_frame_bytes,
+                data: dummy_frame_bytes.clone(),
             };
 
-            // Always store frames in 10s pre-roll circular buffer
             ring_buffer.push(frame.clone());
 
             if detected {
-                if score > peak_motion_score {
-                    peak_motion_score = score;
-                }
+                peak_motion_score = peak_motion_score.max(score);
                 last_motion_instant = Some(now_instant);
 
                 if !is_recording {
-                    info!("MOTION DETECTED! (Score: {:.2}). Starting video sequence recording with -10s pre-roll.", score);
+                    info!("📷 Motion Triggered (Score: {:.2})! Starting -10s circular pre-roll recording...", score);
                     is_recording = true;
                     motion_start_time = Some(now_utc);
-                    // Prepend pre-roll buffer (-10s)
                     recording_frames = ring_buffer.drain_pre_roll();
                 }
             }
@@ -87,98 +97,67 @@ impl CameraManager {
             if is_recording {
                 recording_frames.push(frame);
 
-                // Check if post-roll (+10s) has elapsed since last detected motion frame
-                if let Some(last_m) = last_motion_instant {
-                    if now_instant.duration_since(last_m) > Duration::from_secs(10) {
-                        info!("Motion sequence ended (+10s post-roll completed). Finalizing video clip...");
-                        let end_time = now_utc;
-                        let start_time = motion_start_time.unwrap_or(end_time);
+                if let Some(last_motion) = last_motion_instant {
+                    if now_instant.duration_since(last_motion) > Duration::from_secs(10) {
+                        info!("📷 Motion stopped + 10s post-roll completed. Saving MP4 video clip...");
 
-                        self.save_recording_and_correlate(
-                            start_time,
-                            end_time,
-                            peak_motion_score,
-                            &recording_frames,
-                        )
-                        .await;
+                        if let Some(start_time) = motion_start_time {
+                            let duration_secs = now_utc.signed_duration_since(start_time).num_seconds() as u64;
+                            let filename = format!("motion_{}.mp4", start_time.format("%Y%m%d_%H%M%S"));
+                            let video_path = self.video_dir.join(&filename);
 
-                        // Reset recording state
+                            if let Err(e) = self.save_mp4_video(&video_path, &recording_frames) {
+                                warn!("Failed to save video file {:?}: {}", video_path, e);
+                            } else {
+                                let start_str = start_time.to_rfc3339();
+                                let end_str = now_utc.to_rfc3339();
+
+                                match self.db.record_motion_event_and_correlate(
+                                    &start_str,
+                                    &end_str,
+                                    peak_motion_score,
+                                    &filename,
+                                    &video_path.to_string_lossy(),
+                                    "",
+                                    duration_secs,
+                                ) {
+                                    Ok((_motion_id, video_id, correlated_count)) => {
+                                        info!("Successfully saved video clip '{}' (ID: {}) with {} correlated BLE devices!", filename, video_id, correlated_count);
+                                    }
+                                    Err(e) => warn!("Database motion event logging error: {}", e),
+                                }
+                            }
+                        }
+
                         is_recording = false;
                         recording_frames.clear();
-                        ring_buffer.clear();
-                        peak_motion_score = 0.0;
                         motion_start_time = None;
                         last_motion_instant = None;
+                        peak_motion_score = 0.0;
                     }
                 }
             }
 
-            // Sleep ~33ms (30 FPS)
-            sleep(Duration::from_millis(33)).await;
+            sleep(Duration::from_millis(200)).await;
         }
     }
 
-    fn generate_frame_bytes(&self, frame_num: u64, active_motion: bool) -> Vec<u8> {
-        let mut bytes = vec![128u8; 640 * 480 / 4];
-        // Inject periodic motion every 300 frames (~10s) if idle to test motion recording
-        if active_motion || (frame_num % 300 > 270) {
-            let offset = ((frame_num * 17) % (bytes.len() as u64)) as usize;
-            for i in offset..offset.saturating_add(500).min(bytes.len()) {
-                bytes[i] = 240;
-            }
+    fn generate_frame_bytes(&self, frame: u64, is_rec: bool) -> Vec<u8> {
+        let mut data = vec![0u8; 1000];
+        let offset = ((frame * 13) % 255) as u8;
+        for i in 0..data.len() {
+            data[i] = ((i as u8) ^ offset).wrapping_add(if is_rec { 50 } else { 0 });
         }
-        bytes
+        data
     }
 
-    async fn save_recording_and_correlate(
-        &self,
-        start_time: chrono::DateTime<Utc>,
-        end_time: chrono::DateTime<Utc>,
-        score: f64,
-        frames: &[VideoFrame],
-    ) {
-        let filename = format!("motion_{}.mp4", start_time.format("%Y%m%d_%H%M%S"));
-        let filepath = self.video_dir.join(&filename);
-
-        let duration_secs = (end_time - start_time).num_seconds().max(1) as u64;
-
-        info!(
-            "Saving motion video file: {:?} (Duration: {}s, Frames: {})",
-            filepath, duration_secs, frames.len()
-        );
-
-        // Write video file
-        if let Ok(mut f) = File::create(&filepath) {
-            let _ = f.write_all(b"RAW_VIDEO_STREAM_HEADER_H264_MJPEG_CONTAINER\n");
-            for frame in frames {
-                let _ = f.write_all(&frame.data[..frame.data.len().min(100)]);
-            }
+    fn save_mp4_video(&self, path: &PathBuf, frames: &[VideoFrame]) -> Result<()> {
+        let mut file = File::create(path)?;
+        file.write_all(b"FTYP_MP42_SIMULATED_VIDEO_STREAM\n")?;
+        for frame in frames {
+            file.write_all(&frame.data[..100.min(frame.data.len())])?;
         }
-
-        // Record in SQLite DB & execute BLE Correlation
-        let thumbnail = format!("/videos/{}_thumb.jpg", filename);
-        let video_path_str = filepath.to_string_lossy().to_string();
-
-        let res = self.db.record_motion_event_and_correlate(
-            &start_time.to_rfc3339(),
-            &end_time.to_rfc3339(),
-            score,
-            &filename,
-            &video_path_str,
-            &thumbnail,
-            duration_secs,
-        );
-
-        match res {
-            Ok((motion_id, video_id, corr_count)) => {
-                info!(
-                    "Successfully recorded Motion Event #{} (Video #{}) correlated with {} nearby BLE devices logged 24/7!",
-                    motion_id, video_id, corr_count
-                );
-            }
-            Err(e) => {
-                warn!("Database error recording motion video event: {}", e);
-            }
-        }
+        file.flush()?;
+        Ok(())
     }
 }
