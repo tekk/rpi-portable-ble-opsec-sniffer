@@ -36,6 +36,7 @@ pub async fn start_web_server(
         .route("/api/system/config", post(routes::save_system_config))
         .route("/api/system/camera/status", get(routes::get_camera_status))
         .route("/api/system/camera/toggle", post(routes::toggle_camera))
+        .route("/api/system/camera/test", post(routes::test_camera_device))
         .route("/api/system/storage/space", get(routes::get_storage_info))
         .route("/api/system/nas/config", post(routes::save_nas_config))
         .route("/api/backup/export", get(routes::export_backup))

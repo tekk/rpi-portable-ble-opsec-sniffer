@@ -26,9 +26,70 @@ class SetupWizard {
             this.updateSensitivityHint(parseInt(sensInput.value));
         }
 
+        // Setup Camera Video Output Test Button
+        this.setupCameraTest();
+
         if (!localStorage.getItem('wizard_completed')) {
             setTimeout(() => this.showWizard(), 1000);
         }
+    }
+
+    setupCameraTest() {
+        const btnTest = document.getElementById('btn-test-camera');
+        const camSelect = document.getElementById('wizard-camera-select');
+        const resultPanel = document.getElementById('camera-test-result');
+        const badge = document.getElementById('camera-test-badge');
+        const specs = document.getElementById('camera-test-specs');
+        const preview = document.getElementById('camera-test-preview');
+
+        if (!btnTest || !camSelect) return;
+
+        btnTest.addEventListener('click', async () => {
+            const dev = camSelect.value || '/dev/video0';
+            btnTest.disabled = true;
+            btnTest.innerHTML = `<span class="animate-spin inline-block">🌀</span> Testing...`;
+
+            if (resultPanel) resultPanel.classList.remove('hidden');
+            if (badge) badge.className = "font-bold text-cyan-400";
+            if (badge) badge.textContent = `Testing video output for ${dev}...`;
+            if (specs) specs.textContent = "Probing V4L2 signal...";
+
+            try {
+                const resp = await fetch('/api/system/camera/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device: dev })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    if (badge) {
+                        badge.className = "font-bold text-emerald-400";
+                        badge.textContent = `✓ ${data.status}`;
+                    }
+                    if (specs) specs.textContent = `${data.resolution} @ ${data.fps} FPS`;
+                    if (preview && data.preview_url) {
+                        preview.src = data.preview_url;
+                    }
+                } else {
+                    if (badge) {
+                        badge.className = "font-bold text-rose-400";
+                        badge.textContent = `❌ Video Output Test Failed`;
+                    }
+                    if (specs) specs.textContent = data.error || "Device not outputting video";
+                    if (preview) preview.src = "";
+                }
+            } catch (e) {
+                if (badge) {
+                    badge.className = "font-bold text-rose-400";
+                    badge.textContent = `❌ Test Error`;
+                }
+                if (specs) specs.textContent = e.message;
+            } finally {
+                btnTest.disabled = false;
+                btnTest.innerHTML = `<span>📹 Test</span>`;
+            }
+        });
     }
 
     updateSensitivityHint(val) {
