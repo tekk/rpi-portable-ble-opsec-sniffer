@@ -98,7 +98,22 @@ class QueryStudio {
 
         this.tbodyEl.innerHTML = rows.map(r => `
             <tr class="hover:bg-slate-800/40 transition-colors">
-                ${columns.map(c => `<td class="p-3.5 text-slate-200">${r[c] !== null ? r[c] : '<span class="text-slate-600">NULL</span>'}</td>`).join('')}
+                ${columns.map(c => {
+                    const val = r[c];
+                    if (val === null || val === undefined) {
+                        return `<td class="p-3.5 text-slate-200"><span class="text-slate-600">NULL</span></td>`;
+                    }
+                    const lowerCol = c.toLowerCase();
+                    if (lowerCol.includes('rssi')) {
+                        const bargraph = window.createRssiBargraphHtml ? window.createRssiBargraphHtml(val) : '';
+                        return `<td class="p-3.5 text-cyan-400 font-bold flex items-center">${bargraph} <span>${val} dBm</span></td>`;
+                    }
+                    if (lowerCol.includes('seen') || lowerCol.includes('time') || lowerCol.includes('timestamp') || lowerCol.includes('start') || lowerCol.includes('end')) {
+                        const formattedTime = window.formatLocalTimestamp ? window.formatLocalTimestamp(val) : val;
+                        return `<td class="p-3.5 text-slate-300 font-mono text-[11px]">${formattedTime}</td>`;
+                    }
+                    return `<td class="p-3.5 text-slate-200">${val}</td>`;
+                }).join('')}
             </tr>
         `).join('');
     }

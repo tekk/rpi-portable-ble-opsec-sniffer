@@ -78,7 +78,7 @@ class VideoCorrelator {
         this.tbody.innerHTML = videos.map(v => `
             <tr class="hover:bg-slate-800/40 transition-colors">
                 <td class="p-3.5 font-bold text-slate-100">${v.filename}</td>
-                <td class="p-3.5 text-slate-400">${v.start_time}</td>
+                <td class="p-3.5 text-slate-400 font-mono text-[11px]">${window.formatLocalTimestamp ? window.formatLocalTimestamp(v.start_time) : v.start_time}</td>
                 <td class="p-3.5 text-slate-300 font-bold">${v.duration_secs}s</td>
                 <td class="p-3.5"><span class="px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/30">${v.trigger_score.toFixed(1)}</span></td>
                 <td class="p-3.5"><span class="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 font-bold border border-purple-500/30">${v.correlated_device_count} Devices</span></td>
@@ -97,7 +97,8 @@ class VideoCorrelator {
         this.videoStartTimeEpoch = new Date(startTime).getTime() / 1000;
 
         document.getElementById('video-player-title').textContent = `Motion Video: ${filename}`;
-        document.getElementById('video-meta-time').textContent = `Start: ${startTime}`;
+        const formattedStart = window.formatLocalTimestamp ? window.formatLocalTimestamp(startTime) : startTime;
+        document.getElementById('video-meta-time').textContent = `Start: ${formattedStart}`;
         document.getElementById('video-meta-duration').textContent = `Duration: ${duration}s`;
         document.getElementById('video-meta-devices').textContent = `Devices: ${devCount}`;
 
@@ -161,6 +162,7 @@ class VideoCorrelator {
         this.corrList.innerHTML = Object.values(uniqueDevs).map(item => {
             const catIcon = window.getCategoryIcon ? window.getCategoryIcon(item.inferred_type) : '';
             const brandBadge = window.getBrandBadge ? window.getBrandBadge(item.vendor_name) : item.vendor_name;
+            const rssiBargraph = window.createRssiBargraphHtml ? window.createRssiBargraphHtml(item.rssi) : '';
 
             return `
                 <div class="corr-device-card p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1.5 transition-all duration-200" data-mac="${item.mac_address}">
@@ -168,7 +170,7 @@ class VideoCorrelator {
                         <span class="font-mono font-bold text-xs text-slate-100 flex items-center gap-2">
                             <span>${catIcon}</span> <span>${item.mac_address}</span>
                         </span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">${item.rssi} dBm</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center">${rssiBargraph} <span>${item.rssi} dBm</span></span>
                     </div>
                     <div class="text-[11px] text-slate-400 flex justify-between items-center">
                         <div>${brandBadge}</div>

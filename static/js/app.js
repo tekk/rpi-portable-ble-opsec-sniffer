@@ -152,6 +152,78 @@ function getBrandBadge(vendor) {
     return `<span class="px-2.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 border border-slate-700 font-medium">${vendor}</span>`;
 }
 
+function getRssiBarCount(rssi) {
+    if (rssi == null || isNaN(rssi)) return 0;
+    const val = Number(rssi);
+    if (val <= -90) return 1;
+    if (val <= -83) return 2;
+    if (val <= -76) return 3;
+    if (val <= -69) return 4;
+    if (val <= -62) return 5;
+    if (val <= -55) return 6;
+    if (val <= -45) return 7;
+    return 8;
+}
+
+function createRssiBargraphHtml(rssi) {
+    const activeCount = getRssiBarCount(rssi);
+    const colors = [
+        '#ef4444', // 1px: Red
+        '#f97316', // 2px: Red-Orange
+        '#fb923c', // 3px: Orange
+        '#facc15', // 4px: Yellow-Orange
+        '#eab308', // 5px: Yellow
+        '#a3e635', // 6px: Lime
+        '#4ade80', // 7px: Light Green
+        '#22c55e'  // 8px: Green
+    ];
+    const inactiveColor = '#334155';
+
+    let barsHtml = '';
+    for (let i = 1; i <= 8; i++) {
+        const heightPx = i;
+        const isFilled = i <= activeCount;
+        const color = isFilled ? colors[i - 1] : inactiveColor;
+        barsHtml += `<span style="display:inline-block; width:1px; height:${heightPx}px; background-color:${color}; vertical-align:bottom; margin:0; padding:0;"></span>`;
+    }
+
+    return `<span style="display:inline-flex; align-items:flex-end; gap:0px; height:8px; width:8px; margin-right:6px; vertical-align:middle;" title="Signal Strength: ${rssi} dBm (${activeCount}/8 bars)">${barsHtml}</span>`;
+}
+
+function formatLocalTimestamp(ts) {
+    if (!ts) return '--';
+    let date;
+    if (typeof ts === 'number') {
+        date = new Date(ts < 1e11 ? ts * 1000 : ts);
+    } else if (typeof ts === 'string') {
+        let isoStr = ts.includes('T') ? ts : ts.replace(' ', 'T');
+        if (!isoStr.endsWith('Z') && !isoStr.includes('+')) {
+            isoStr += 'Z';
+        }
+        date = new Date(isoStr);
+        if (isNaN(date.getTime())) {
+            date = new Date(ts);
+        }
+    } else if (ts instanceof Date) {
+        date = ts;
+    } else {
+        return String(ts);
+    }
+
+    if (isNaN(date.getTime())) return String(ts);
+
+    const YYYY = date.getFullYear();
+    const MM = String(date.getMonth() + 1).padStart(2, '0');
+    const DD = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+
+    return `${YYYY}-${MM}-${DD} ${hh}-${mm}-${ss}`;
+}
+
+window.createRssiBargraphHtml = createRssiBargraphHtml;
+window.formatLocalTimestamp = formatLocalTimestamp;
 window.getCategoryIcon = getCategoryIcon;
 window.getBrandBadge = getBrandBadge;
 
@@ -197,13 +269,13 @@ function setupWebSocket() {
             // Append row to Live Packet Feed table (keep max 20 rows)
             const rowHtml = `
                 <tr class="hover:bg-slate-800/40 transition-colors cursor-pointer" onclick="window.deviceChart.showDeviceHistory('${packet.mac_address}', '${packet.local_name || packet.vendor_name}')">
-                    <td class="p-3.5 text-slate-300">${packet.timestamp.substring(11, 19)}</td>
+                    <td class="p-3.5 text-slate-300 font-mono text-[11px]">${formatLocalTimestamp(packet.timestamp)}</td>
                     <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">${packet.adapter_name}</span></td>
                     <td class="p-3.5 font-bold text-cyan-400 hover:underline">${packet.mac_address}</td>
                     <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">${packet.address_type}</span></td>
                     <td class="p-3.5"><span class="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold flex items-center gap-2 w-fit">${catIcon} <span>${packet.inferred_device_type}</span></span></td>
                     <td class="p-3.5">${brandBadge}</td>
-                    <td class="p-3.5 font-bold text-cyan-400">${packet.rssi} dBm</td>
+                    <td class="p-3.5 font-bold text-cyan-400 flex items-center">${createRssiBargraphHtml(packet.rssi)} <span>${packet.rssi} dBm</span></td>
                     <td class="p-3.5 text-slate-400 font-mono text-[11px]">${packet.local_name || 'N/A'}</td>
                 </tr>
             `;
@@ -260,9 +332,9 @@ function renderDevicesTable(devices) {
                 <td class="p-3.5"><span class="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold flex items-center gap-2 w-fit">${catIcon} <span>${d.inferred_type}</span></span></td>
                 <td class="p-3.5">${brandBadge}</td>
                 <td class="p-3.5 text-slate-400">${d.last_adv_name || 'N/A'}</td>
-                <td class="p-3.5 font-bold text-cyan-400">${d.max_rssi} dBm</td>
+                <td class="p-3.5 font-bold text-cyan-400 flex items-center">${createRssiBargraphHtml(d.max_rssi)} <span>${d.max_rssi} dBm</span></td>
                 <td class="p-3.5 text-slate-300 font-bold">${d.total_packets}</td>
-                <td class="p-3.5 text-slate-400">${d.last_seen.substring(11, 19)}</td>
+                <td class="p-3.5 text-slate-400 font-mono text-[11px]">${formatLocalTimestamp(d.last_seen)}</td>
                 <td class="p-3.5">
                     <button class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold transition-all text-xs flex items-center gap-1.5" onclick="window.deviceChart.showDeviceHistory('${d.mac_address}', '${d.last_adv_name || d.vendor_name}')">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>

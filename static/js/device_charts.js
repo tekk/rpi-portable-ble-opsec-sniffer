@@ -43,7 +43,7 @@ class DeviceRssiChart {
     }
 
     renderChart(history) {
-        const labels = history.map(h => h.timestamp.substring(11, 19));
+        const labels = history.map(h => window.formatLocalTimestamp ? window.formatLocalTimestamp(h.timestamp) : h.timestamp);
         const rssiData = history.map(h => h.rssi);
         const snrData = history.map(h => h.snr);
         const distanceData = history.map(h => h.estimated_distance_m);
