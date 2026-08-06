@@ -1,9 +1,5 @@
 [target.aarch64-unknown-linux-gnu]
-pre-build = [
-    "apt-get update && apt-get install -y libclang-dev clang"
-]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:edge"
 
 [target.armv7-unknown-linux-gnueabihf]
-pre-build = [
-    "apt-get update && apt-get install -y libclang-dev clang"
-]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:edge"
