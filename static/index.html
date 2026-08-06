@@ -428,8 +428,12 @@
                     </select>
                 </div>
                 <div class="space-y-2">
-                    <label class="text-xs text-slate-300">Motion Sensitivity Trigger Score (5 = High, 30 = Low):</label>
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-slate-300">Motion Sensitivity:</label>
+                        <span id="wizard-sensitivity-label" class="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">Medium</span>
+                    </div>
                     <input type="range" min="5" max="30" value="15" id="wizard-sensitivity-input" class="w-full accent-cyan-500">
+                    <p class="text-[11px] text-slate-400 italic" id="wizard-sensitivity-hint">Sensitivity: Medium</p>
                 </div>
             </div>
 
@@ -443,8 +447,21 @@
                         <option value="hci1">hci1 (Sena UD-100 CSR Dongle)</option>
                     </select>
                 </div>
-                <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-300">
-                    Auto-downloads IEEE vendor OUI database and multi-layer payload fingerprinting rules for iPhone, AirTag, Android, ESP32, nRF, Smartwatch, TV, and 15+ device types.
+                <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3">
+                    <p>Auto-downloads IEEE vendor OUI database and multi-layer payload fingerprinting rules for iPhone, AirTag, Android, ESP32, nRF, Smartwatch, TV, and 15+ device types.</p>
+                    
+                    <!-- OUI Download Progress Bar UI -->
+                    <div id="oui-download-container" class="hidden space-y-2 pt-2 border-t border-slate-800">
+                        <div class="flex justify-between items-center text-[11px]">
+                            <span class="font-bold text-cyan-400 flex items-center gap-1.5" id="oui-download-status">
+                                <span class="animate-spin text-cyan-400 inline-block">🌀</span> Downloading IEEE OUI Database...
+                            </span>
+                            <span class="font-mono text-slate-400" id="oui-download-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                            <div id="oui-download-progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

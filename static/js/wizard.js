@@ -19,9 +19,31 @@ class SetupWizard {
             btnRunWizard.addEventListener('click', () => this.showWizard());
         }
 
+        // Setup Sensitivity Slider Hint Listener
+        const sensInput = document.getElementById('wizard-sensitivity-input');
+        if (sensInput) {
+            sensInput.addEventListener('input', (e) => this.updateSensitivityHint(parseInt(e.target.value)));
+            this.updateSensitivityHint(parseInt(sensInput.value));
+        }
+
         if (!localStorage.getItem('wizard_completed')) {
             setTimeout(() => this.showWizard(), 1000);
         }
+    }
+
+    updateSensitivityHint(val) {
+        const label = document.getElementById('wizard-sensitivity-label');
+        const hint = document.getElementById('wizard-sensitivity-hint');
+        let text = "Medium";
+
+        if (val <= 9) text = "Very high";
+        else if (val <= 14) text = "High";
+        else if (val <= 19) text = "Medium";
+        else if (val <= 24) text = "Low";
+        else text = "Very low";
+
+        if (label) label.textContent = text;
+        if (hint) hint.textContent = `Sensitivity: ${text}`;
     }
 
     async showWizard() {
@@ -50,12 +72,62 @@ class SetupWizard {
         }
     }
 
-    nextStep() {
+    async nextStep() {
+        // If on Step 2 (BLE & OUI), execute actual IEEE OUI Database Download with progress bar
+        if (this.currentStep === 2) {
+            await this.downloadOuiDatabaseInWizard();
+        }
+
         if (this.currentStep < this.totalSteps) {
             this.currentStep++;
             this.updateStepVisibility();
         } else {
             this.finishWizard();
+        }
+    }
+
+    async downloadOuiDatabaseInWizard() {
+        const container = document.getElementById('oui-download-container');
+        const progressBar = document.getElementById('oui-download-progress-bar');
+        const percentText = document.getElementById('oui-download-percent');
+        const statusText = document.getElementById('oui-download-status');
+        const nextBtn = document.getElementById('wizard-btn-next');
+
+        if (!container || !progressBar) return;
+
+        container.classList.remove('hidden');
+        if (nextBtn) nextBtn.disabled = true;
+
+        let progress = 10;
+        const interval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.floor(Math.random() * 15) + 5;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = `${progress}%`;
+                percentText.textContent = `${progress}%`;
+            }
+        }, 150);
+
+        try {
+            statusText.innerHTML = `<span class="animate-spin text-cyan-400 inline-block">🌀</span> Downloading official IEEE OUI database mirror...`;
+            const resp = await fetch('/api/oui/update', { method: 'POST' });
+            const data = await resp.json();
+
+            clearInterval(interval);
+            progressBar.style.width = `100%`;
+            percentText.textContent = `100%`;
+
+            const vendorCount = (data.updated_vendors !== undefined) ? data.updated_vendors : (data.updated_count || 0);
+            statusText.innerHTML = `<span class="text-emerald-400 font-bold">✓ Successfully loaded ${vendorCount.toLocaleString()} IEEE OUI vendor records!</span>`;
+            
+            await new Promise(res => setTimeout(res, 800));
+        } catch (e) {
+            clearInterval(interval);
+            console.error("OUI download wizard error:", e);
+            statusText.innerHTML = `<span class="text-amber-400 font-bold">⚠️ Using 50+ built-in offline vendor OUI rules.</span>`;
+            await new Promise(res => setTimeout(res, 800));
+        } finally {
+            if (nextBtn) nextBtn.disabled = false;
         }
     }
 
@@ -67,16 +139,16 @@ class SetupWizard {
     }
 
     updateStepVisibility() {
-        const steps = [this.step1, this.step2, this.step3, this.step4, this.step5];
-        steps.forEach((s, idx) => {
-            if (s) {
-                if (idx + 1 === this.currentStep) {
-                    s.classList.remove('hidden');
+        for (let i = 1; i <= this.totalSteps; i++) {
+            const stepEl = document.getElementById(`wizard-step-${i}`);
+            if (stepEl) {
+                if (i === this.currentStep) {
+                    stepEl.classList.remove('hidden');
                 } else {
-                    s.classList.add('hidden');
+                    stepEl.classList.add('hidden');
                 }
             }
-        });
+        }
 
         const progressEl = document.getElementById('wizard-progress-bar');
         if (progressEl) {

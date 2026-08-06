@@ -43,7 +43,7 @@ impl OuiDatabase {
             ("00:09:A7", "Nordic Semiconductor ASA"),
             ("D0:03:4B", "LG Electronics (Mobile Communications)"),
             ("00:0B:E1", "LG Electronics"),
-            ("00:1A:7D", "Sena Technologies, Inc."), // Sena UD-100 HCI dongles
+            ("00:1A:7D", "Sena Technologies, Inc."),
             ("00:50:F2", "Microsoft Corporation"),
             ("00:15:5D", "Microsoft Corporation"),
             ("00:04:4B", "NVIDIA Corporation"),
@@ -83,39 +83,97 @@ impl OuiDatabase {
     }
 
     pub async fn download_and_update(&self) -> Result<usize> {
-        info!("Fetching latest IEEE OUI database mirror...");
-        let url = "https://raw.githubusercontent.com/wireshark/wireshark/master/manuf";
+        info!("Fetching latest official IEEE OUI database from standards-oui.ieee.org...");
+        let primary_url = "https://standards-oui.ieee.org/oui/oui.csv";
 
-        match reqwest::get(url).await {
-            Ok(resp) => {
-                if resp.status().is_success() {
-                    let body = resp.text().await?;
-                    let mut count = 0;
-                    if let Ok(mut map) = self.vendors.write() {
-                        for line in body.lines() {
-                            if line.starts_with('#') || line.trim().is_empty() {
-                                continue;
-                            }
-                            let parts: Vec<&str> = line.split_whitespace().collect();
-                            if parts.len() >= 2 {
-                                let prefix = parts[0].replace('-', ":").to_uppercase();
-                                if prefix.len() == 8 {
-                                    let vendor = parts[1..].join(" ");
-                                    map.insert(prefix, vendor);
-                                    count += 1;
-                                }
-                            }
-                        }
-                    }
+        match reqwest::get(primary_url).await {
+            Ok(resp) if resp.status().is_success() => {
+                let body = resp.text().await?;
+                let count = self.parse_and_store_csv(&body);
+                if count > 0 {
                     info!("Successfully updated IEEE OUI database with {} vendors.", count);
                     return Ok(count);
                 }
             }
+            Ok(resp) => {
+                warn!("IEEE OUI CSV download returned HTTP status: {}", resp.status());
+            }
             Err(e) => {
-                warn!("Could not fetch remote IEEE OUI database (Offline mode retained): {}", e);
+                warn!("Failed to download primary IEEE OUI database: {}", e);
+            }
+        }
+
+        // Secondary fallback to IEEE oui.txt format
+        let fallback_url = "https://standards-oui.ieee.org/oui/oui.txt";
+        info!("Attempting fallback fetch from IEEE oui.txt...");
+        if let Ok(resp) = reqwest::get(fallback_url).await {
+            if resp.status().is_success() {
+                let body = resp.text().await?;
+                let count = self.parse_and_store_txt(&body);
+                if count > 0 {
+                    info!("Successfully updated IEEE OUI database via fallback txt with {} vendors.", count);
+                    return Ok(count);
+                }
             }
         }
 
         Ok(0)
+    }
+
+    fn parse_and_store_csv(&self, body: &str) -> usize {
+        let mut count = 0;
+        if let Ok(mut map) = self.vendors.write() {
+            for line in body.lines() {
+                if line.starts_with("Registry") || line.trim().is_empty() {
+                    continue;
+                }
+                
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 3 {
+                    let hex_assignment = parts[1].trim().trim_matches('"');
+                    if hex_assignment.len() == 6 && hex_assignment.chars().all(|c| c.is_ascii_hexdigit()) {
+                        let prefix = format!(
+                            "{}:{}:{}",
+                            &hex_assignment[0..2],
+                            &hex_assignment[2..4],
+                            &hex_assignment[4..6]
+                        ).to_uppercase();
+
+                        let vendor_name = parts[2].trim().trim_matches('"').to_string();
+                        if !vendor_name.is_empty() {
+                            map.insert(prefix, vendor_name);
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+
+    fn parse_and_store_txt(&self, body: &str) -> usize {
+        let mut count = 0;
+        if let Ok(mut map) = self.vendors.write() {
+            for line in body.lines() {
+                if line.contains("(base 16)") {
+                    let parts: Vec<&str> = line.split("(base 16)").collect();
+                    if parts.len() == 2 {
+                        let hex_assignment = parts[0].trim();
+                        let vendor_name = parts[1].trim().to_string();
+                        if hex_assignment.len() == 6 && !vendor_name.is_empty() {
+                            let prefix = format!(
+                                "{}:{}:{}",
+                                &hex_assignment[0..2],
+                                &hex_assignment[2..4],
+                                &hex_assignment[4..6]
+                            ).to_uppercase();
+                            map.insert(prefix, vendor_name);
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
     }
 }
