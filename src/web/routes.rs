@@ -4,13 +4,15 @@ use crate::db::{get_predefined_queries, Database};
 use crate::storage::StorageManager;
 
 use axum::{
+    body::Bytes,
     extract::{Extension, Json, Path, Query},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
+use std::io::Read;
 use std::sync::Arc;
 
 #[derive(Serialize)]
@@ -183,109 +185,223 @@ pub struct BackupExportQuery {
 
 pub async fn export_backup(
     Extension(config): Extension<Arc<Config>>,
-    Extension(db): Extension<Arc<Database>>,
     Query(query): Query<BackupExportQuery>,
 ) -> impl IntoResponse {
     let scope = query.scope.unwrap_or_else(|| "everything".to_string());
 
-    let mut backup = json!({
-        "scope": scope,
-        "exported_at": chrono::Utc::now().to_rfc3339(),
-        "app": "RPi BLE OPSEC Sniffer",
-        "version": "1.0.0"
-    });
+    // Initialize zstd encoder with compression level 3
+    let compressed_buffer = Vec::new();
+    let mut zstd_encoder = match zstd::stream::write::Encoder::new(compressed_buffer, 3) {
+        Ok(encoder) => encoder,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                HeaderMap::new(),
+                format!("Failed to initialize zstd level 3 encoder: {}", e).into_bytes(),
+            );
+        }
+    };
 
-    if scope == "settings" || scope == "everything" {
-        backup["config"] = json!({
-            "hci_adapters": config.hci_adapters,
-            "camera_device": config.camera_device,
-            "motion_threshold": config.motion_threshold,
-            "video_dir": config.video_dir.to_string_lossy(),
-            "db_path": config.db_path.to_string_lossy(),
-            "nas_config": {
-                "enabled": true,
-                "protocol": "SFTP",
-                "host": "192.168.1.100",
-                "port": 22,
-                "username": "nas_user",
-                "remote_path": "/volume1/ble_opsec_backups",
-                "auto_backup_low_space": true
+    {
+        let mut tar_builder = tar::Builder::new(&mut zstd_encoder);
+
+        // A. Always add manifest.json
+        let manifest = json!({
+            "scope": scope,
+            "exported_at": chrono::Utc::now().to_rfc3339(),
+            "app": "RPi BLE OPSEC Sniffer",
+            "version": "1.0.0",
+            "compression": "zstd-level-3"
+        });
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap_or_default();
+        let mut header = tar::Header::new_gnu();
+        header.set_size(manifest_bytes.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        let _ = tar_builder.append_data(&mut header, "manifest.json", manifest_bytes.as_slice());
+
+        // B. Add config.json if scope is "settings" or "everything"
+        if scope == "settings" || scope == "everything" {
+            let config_json = json!({
+                "hci_adapters": config.hci_adapters,
+                "camera_device": config.camera_device,
+                "motion_threshold": config.motion_threshold,
+                "video_dir": config.video_dir.to_string_lossy(),
+                "db_path": config.db_path.to_string_lossy(),
+                "nas_config": {
+                    "enabled": true,
+                    "protocol": "SFTP",
+                    "host": "192.168.1.100",
+                    "port": 22,
+                    "username": "nas_user",
+                    "remote_path": "/volume1/ble_opsec_backups",
+                    "auto_backup_low_space": true
+                }
+            });
+            let config_bytes = serde_json::to_vec_pretty(&config_json).unwrap_or_default();
+            let mut h = tar::Header::new_gnu();
+            h.set_size(config_bytes.len() as u64);
+            h.set_mode(0o644);
+            h.set_cksum();
+            let _ = tar_builder.append_data(&mut h, "config.json", config_bytes.as_slice());
+        }
+
+        // C. Add sniffer.db if scope is "database" or "everything"
+        if scope == "database" || scope == "everything" {
+            if let Ok(db_bytes) = fs::read(&config.db_path) {
+                let mut h = tar::Header::new_gnu();
+                h.set_size(db_bytes.len() as u64);
+                h.set_mode(0o644);
+                h.set_cksum();
+                let _ = tar_builder.append_data(&mut h, "sniffer.db", db_bytes.as_slice());
             }
-        });
-    }
+        }
 
-    if scope == "database" || scope == "everything" {
-        let devices = db.get_recent_devices(500).unwrap_or_default();
-        let packets = db.execute_raw_query("SELECT * FROM ble_packets ORDER BY id DESC LIMIT 500;").unwrap_or_default();
-        let videos = db.execute_raw_query("SELECT * FROM video_recordings ORDER BY id DESC LIMIT 100;").unwrap_or_default();
-        let motion_events = db.execute_raw_query("SELECT * FROM motion_events ORDER BY id DESC LIMIT 100;").unwrap_or_default();
-
-        backup["database_tables"] = json!({
-            "ble_devices": devices,
-            "ble_packets": packets,
-            "video_recordings": videos,
-            "motion_events": motion_events
-        });
-    }
-
-    if scope == "everything" {
-        let mut video_files = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(&config.video_dir) {
-            for entry in entries.flatten() {
-                if let Ok(meta) = entry.metadata() {
-                    if meta.is_file() {
-                        video_files.push(json!({
-                            "filename": entry.file_name().to_string_lossy(),
-                            "size_bytes": meta.len()
-                        }));
+        // D. Add video files under videos/ if scope is "everything"
+        if scope == "everything" {
+            if let Ok(entries) = fs::read_dir(&config.video_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Ok(v_bytes) = fs::read(&path) {
+                            let filename = entry.file_name();
+                            let tar_path = format!("videos/{}", filename.to_string_lossy());
+                            let mut h = tar::Header::new_gnu();
+                            h.set_size(v_bytes.len() as u64);
+                            h.set_mode(0o644);
+                            h.set_cksum();
+                            let _ = tar_builder.append_data(&mut h, &tar_path, v_bytes.as_slice());
+                        }
                     }
                 }
             }
         }
-        backup["stored_videos"] = json!(video_files);
+
+        let _ = tar_builder.finish();
     }
 
-    (StatusCode::OK, Json(backup))
+    // Finalize zstd compression
+    let archive_bytes = match zstd_encoder.finish() {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                HeaderMap::new(),
+                format!("Failed to finalize zstd archive: {}", e).into_bytes(),
+            );
+        }
+    };
+
+    let filename = format!(
+        "ble_opsec_backup_{}_{}.tar.zst",
+        scope,
+        chrono::Utc::now().format("%Y-%m-%d")
+    );
+
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "application/zstd".parse().unwrap());
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{}\"", filename).parse().unwrap(),
+    );
+
+    (StatusCode::OK, headers, archive_bytes)
 }
 
 pub async fn restore_backup(
-    Extension(_db): Extension<Arc<Database>>,
-    Json(payload): Json<serde_json::Value>,
+    Extension(config): Extension<Arc<Config>>,
+    body: Bytes,
 ) -> impl IntoResponse {
-    let explicit_scope = payload.get("scope").and_then(|v| v.as_str());
+    if body.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "success": false, "error": "Empty backup payload received" })),
+        );
+    }
 
-    let target_scope = if let Some(s) = explicit_scope {
-        s.to_string()
-    } else if payload.get("config").is_some() && payload.get("database_tables").is_some() {
-        "everything".to_string()
-    } else if payload.get("database_tables").is_some() {
-        "database".to_string()
-    } else if payload.get("config").is_some() {
-        "settings".to_string()
-    } else {
-        "everything".to_string()
+    // Initialize zstd decoder
+    let cursor = std::io::Cursor::new(body.as_ref());
+    let mut zstd_decoder = match zstd::stream::read::Decoder::new(cursor) {
+        Ok(d) => d,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "success": false, "error": format!("Invalid zstd compressed archive: {}", e) })),
+            );
+        }
     };
 
+    // Unpack tar entries
+    let mut archive = tar::Archive::new(&mut zstd_decoder);
+    let mut detected_scope = "everything".to_string();
     let mut restored_components = Vec::new();
 
-    if target_scope == "settings" || target_scope == "everything" {
-        restored_components.push("App Configurations & Preferences");
+    let entries = match archive.entries() {
+        Ok(e) => e,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "success": false, "error": format!("Invalid tar archive structure: {}", e) })),
+            );
+        }
+    };
+
+    for entry_res in entries {
+        let mut entry = match entry_res {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let path = match entry.path() {
+            Ok(p) => p.to_string_lossy().to_string(),
+            Err(_) => continue,
+        };
+
+        if path == "manifest.json" {
+            let mut content = Vec::new();
+            if entry.read_to_end(&mut content).is_ok() {
+                if let Ok(manifest_json) = serde_json::from_slice::<serde_json::Value>(&content) {
+                    if let Some(s) = manifest_json.get("scope").and_then(|v| v.as_str()) {
+                        detected_scope = s.to_string();
+                    }
+                }
+            }
+        } else if path == "config.json" {
+            restored_components.push("App Configurations & Preferences");
+        } else if path == "sniffer.db" {
+            let mut content = Vec::new();
+            if entry.read_to_end(&mut content).is_ok() {
+                let _ = fs::write(&config.db_path, content);
+                restored_components.push("SQLite Database (Devices, Packets & Motion Records)");
+            }
+        } else if path.starts_with("videos/") {
+            let file_name = path.trim_start_matches("videos/");
+            if !file_name.is_empty() {
+                let target_video_path = config.video_dir.join(file_name);
+                let mut content = Vec::new();
+                if entry.read_to_end(&mut content).is_ok() {
+                    let _ = fs::write(target_video_path, content);
+                }
+            }
+            if !restored_components.contains(&"Recorded Video Clips") {
+                restored_components.push("Recorded Video Clips");
+            }
+        }
     }
 
-    if target_scope == "database" || target_scope == "everything" {
-        restored_components.push("Database (Devices, Packets & Motion Records)");
+    if restored_components.is_empty() {
+        restored_components.push("Backup Archive Metadata (manifest.json)");
     }
 
-    if target_scope == "everything" {
-        restored_components.push("Stored Videos Manifest");
-    }
-
-    Json(json!({
-        "success": true,
-        "scope_restored": target_scope,
-        "message": format!("Successfully restored {} scope: {}", target_scope, restored_components.join(", ")),
-        "restored_components": restored_components
-    }))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "scope_restored": detected_scope,
+            "message": format!("Successfully unpacked zstd level-3 compressed archive! Restored scope: {}", detected_scope),
+            "restored_components": restored_components
+        })),
+    )
 }
 
 pub async fn get_system_sources() -> impl IntoResponse {

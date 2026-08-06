@@ -140,16 +140,16 @@ class StorageBackupManager {
 
         try {
             const resp = await fetch(`/api/backup/export?scope=${encodeURIComponent(scope)}`);
-            const data = await resp.json();
-
-            const jsonStr = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
+            if (!resp.ok) {
+                throw new Error(`HTTP error! status: ${resp.status}`);
+            }
+            const blob = await resp.blob();
 
             const dateStr = new Date().toISOString().substring(0, 10);
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ble_opsec_backup_${scope}_${dateStr}.json`;
+            a.download = `ble_opsec_backup_${scope}_${dateStr}.tar.zst`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -163,33 +163,27 @@ class StorageBackupManager {
         const file = event.target.files[0];
         if (!file) return;
 
-        const restoreScopeSelect = document.getElementById('restore-scope-select');
-        const selectedScope = restoreScopeSelect ? restoreScopeSelect.value : 'auto';
-
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const json = JSON.parse(e.target.result);
-
-                if (selectedScope !== 'auto') {
-                    json.scope = selectedScope;
-                }
-
+                const arrayBuffer = e.target.result;
                 const resp = await fetch('/api/backup/restore', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(json)
+                    headers: { 'Content-Type': 'application/zstd' },
+                    body: arrayBuffer
                 });
                 const data = await resp.json();
                 if (data.success) {
-                    alert(`Backup restored successfully!\nRestored scope: ${data.scope_restored}\nRestored components: ${data.restored_components.join(', ')}`);
+                    alert(`Compressed backup (.tar.zst) restored successfully!\nRestored scope: ${data.scope_restored}\nComponents: ${data.restored_components.join(', ')}`);
                     location.reload();
+                } else {
+                    alert(`Failed to restore backup archive: ${data.error || 'Unknown error'}`);
                 }
             } catch (err) {
-                alert(`Invalid backup file: ${err.message}`);
+                alert(`Invalid backup archive file: ${err.message}`);
             }
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     }
 }
 
