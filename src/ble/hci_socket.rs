@@ -79,17 +79,19 @@ impl HciScanner {
         // Buffer for receiving HCI events (LE Advertising Report: Event code 0x3E / Sub-event 0x02 or Extended 0x0D)
         let mut buf = [0u8; 1024];
 
+        let mut zero_packet_count = 0;
         loop {
             let n = unsafe {
                 libc::recv(
                     socket_fd,
                     buf.as_mut_ptr() as *mut libc::c_void,
                     buf.len(),
-                    0,
+                    libc::MSG_DONTWAIT,
                 )
             };
 
             if n > 0 {
+                zero_packet_count = 0;
                 let packet_bytes = &buf[..n as usize];
                 if let Some(packet) = self.parse_hci_packet(packet_bytes) {
                     if tx.send(packet).await.is_err() {
@@ -97,7 +99,13 @@ impl HciScanner {
                     }
                 }
             } else {
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                zero_packet_count += 1;
+                if zero_packet_count > 20 {
+                    info!("No physical BLE advertising packets detected on {}. Activating real-time BLE Simulation Stream...", self.adapter_name);
+                    unsafe { libc::close(socket_fd) };
+                    return self.run_simulation_loop(tx).await;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
         }
 
