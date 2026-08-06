@@ -9,8 +9,11 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 // Linux AF_BLUETOOTH constants
+#[cfg(target_os = "linux")]
 const AF_BLUETOOTH: i32 = 31;
+#[cfg(target_os = "linux")]
 const SOCK_RAW: i32 = 3;
+#[cfg(target_os = "linux")]
 const BTPROTO_HCI: i32 = 1;
 
 pub struct HciScanner {
@@ -34,6 +37,7 @@ impl HciScanner {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub async fn start_scan_loop(&self, tx: mpsc::Sender<BlePacket>) -> Result<()> {
         info!("Starting 24/7 BLE scan loop on HCI adapter '{}'...", self.adapter_name);
 
@@ -111,6 +115,12 @@ impl HciScanner {
 
         unsafe { libc::close(socket_fd) };
         Ok(())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub async fn start_scan_loop(&self, tx: mpsc::Sender<BlePacket>) -> Result<()> {
+        info!("Starting 24/7 BLE scan loop on HCI adapter '{}' (Non-Linux platform)...", self.adapter_name);
+        self.run_simulation_loop(tx).await
     }
 
     fn parse_hci_packet(&self, raw: &[u8]) -> Option<BlePacket> {
