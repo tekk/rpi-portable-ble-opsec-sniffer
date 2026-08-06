@@ -14,6 +14,8 @@ class VideoCorrelator {
     }
 
     init() {
+        this.cachedVideos = [];
+        this.videoSorter = window.TableSorter ? new window.TableSorter('table-videos', () => this.renderVideoTable(this.cachedVideos)) : null;
         this.loadVideos();
         this.setupControls();
 
@@ -60,9 +62,8 @@ class VideoCorrelator {
         try {
             const resp = await fetch('/api/videos');
             const data = await resp.json();
-            if (data.videos) {
-                this.renderVideoTable(data.videos);
-            }
+            this.cachedVideos = data.videos || [];
+            this.renderVideoTable(this.cachedVideos);
         } catch (e) {
             console.error("Failed to load motion videos:", e);
         }
@@ -70,12 +71,15 @@ class VideoCorrelator {
 
     renderVideoTable(videos) {
         if (!this.tbody) return;
-        if (videos.length === 0) {
+        const list = videos || this.cachedVideos || [];
+        const sorted = this.videoSorter ? this.videoSorter.sortData(list) : list;
+
+        if (sorted.length === 0) {
             this.tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">No recorded motion events yet.</td></tr>`;
             return;
         }
 
-        this.tbody.innerHTML = videos.map(v => `
+        this.tbody.innerHTML = sorted.map(v => `
             <tr class="hover:bg-slate-800/40 transition-colors">
                 <td class="p-3.5 font-bold text-slate-100">${v.filename}</td>
                 <td class="p-3.5 text-slate-400 font-mono text-[11px]">${window.formatLocalTimestamp ? window.formatLocalTimestamp(v.start_time) : v.start_time}</td>

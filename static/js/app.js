@@ -222,10 +222,213 @@ function formatLocalTimestamp(ts) {
     return `${YYYY}-${MM}-${DD} ${hh}-${mm}-${ss}`;
 }
 
+class TableSorter {
+    constructor(tableId, onSortChange) {
+        this.tableEl = document.getElementById(tableId);
+        this.onSortChange = onSortChange;
+        this.sortCol = null;
+        this.sortDirection = null; // null (not sorted) -> 'asc' -> 'desc' -> null
+
+        if (this.tableEl) {
+            this.init();
+        }
+    }
+
+    init() {
+        const headers = this.tableEl.querySelectorAll('thead th');
+        headers.forEach((th, idx) => {
+            const dataKey = th.getAttribute('data-sort-key');
+            if (dataKey === 'none') return;
+
+            th.classList.add('cursor-pointer', 'select-none', 'hover:text-cyan-400', 'transition-colors');
+
+            if (!th.querySelector('.sort-icon')) {
+                const labelText = th.textContent.trim();
+                th.innerHTML = `
+                    <div class="flex items-center justify-between gap-1">
+                        <span>${labelText}</span>
+                        <span class="sort-icon text-[10px] text-slate-600">↕</span>
+                    </div>
+                `;
+            }
+
+            th.addEventListener('click', () => {
+                this.cycleSort(dataKey || idx);
+            });
+        });
+    }
+
+    cycleSort(colKey) {
+        if (this.sortCol !== colKey) {
+            this.sortCol = colKey;
+            this.sortDirection = 'asc';
+        } else {
+            if (this.sortDirection === 'asc') {
+                this.sortDirection = 'desc';
+            } else if (this.sortDirection === 'desc') {
+                this.sortDirection = null;
+                this.sortCol = null;
+            } else {
+                this.sortDirection = 'asc';
+            }
+        }
+
+        this.updateHeaderIcons();
+        if (this.onSortChange) {
+            this.onSortChange(this.sortCol, this.sortDirection);
+        }
+    }
+
+    updateHeaderIcons() {
+        if (!this.tableEl) return;
+        const headers = this.tableEl.querySelectorAll('thead th');
+        headers.forEach((th, idx) => {
+            const dataKey = th.getAttribute('data-sort-key') || idx;
+            const iconEl = th.querySelector('.sort-icon');
+            if (!iconEl) return;
+
+            if (this.sortCol === dataKey && this.sortDirection !== null) {
+                th.classList.add('text-cyan-400', 'font-bold');
+                th.classList.remove('text-slate-400');
+                if (this.sortDirection === 'asc') {
+                    iconEl.textContent = '▲';
+                    iconEl.className = 'sort-icon text-[11px] text-cyan-400 font-black';
+                } else {
+                    iconEl.textContent = '▼';
+                    iconEl.className = 'sort-icon text-[11px] text-cyan-400 font-black';
+                }
+            } else {
+                th.classList.remove('text-cyan-400', 'font-bold');
+                th.classList.add('text-slate-400');
+                iconEl.textContent = '↕';
+                iconEl.className = 'sort-icon text-[10px] text-slate-600';
+            }
+        });
+    }
+
+    sortData(dataArray) {
+        if (!this.sortCol || !this.sortDirection || !Array.isArray(dataArray)) {
+            return [...dataArray];
+        }
+
+        const dir = this.sortDirection === 'asc' ? 1 : -1;
+        const colKey = this.sortCol;
+
+        return [...dataArray].sort((a, b) => {
+            let valA = a[colKey] !== undefined ? a[colKey] : a;
+            let valB = b[colKey] !== undefined ? b[colKey] : b;
+
+            if (valA == null) valA = '';
+            if (valB == null) valB = '';
+
+            if (typeof valA === 'number' && typeof valB === 'number') {
+                return (valA - valB) * dir;
+            }
+
+            const strA = String(valA).toLowerCase();
+            const strB = String(valB).toLowerCase();
+            return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+        });
+    }
+}
+
+window.TableSorter = TableSorter;
 window.createRssiBargraphHtml = createRssiBargraphHtml;
 window.formatLocalTimestamp = formatLocalTimestamp;
 window.getCategoryIcon = getCategoryIcon;
 window.getBrandBadge = getBrandBadge;
+
+let devicesSorter = null;
+let packetsSorter = null;
+let cachedPackets = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Submodules
+    window.radar = new window.BleRadar('radarCanvas');
+    window.videoCorrelator = new window.VideoCorrelator();
+    window.queryStudio = new window.QueryStudio();
+    window.deviceChart = new window.DeviceRssiChart();
+    window.wizard = new window.SetupWizard();
+    window.storageManager = new window.StorageBackupManager();
+
+    // Initialize Table Sorters (3-stage sort: Not sorted -> Ascending -> Descending -> Not sorted)
+    devicesSorter = new TableSorter('table-devices', () => renderDevicesTable(cachedDevices));
+    packetsSorter = new TableSorter('table-packets', () => renderPacketsFeed());
+
+    // Camera Toggle Button Setup
+    setupCameraToggle();
+
+    // Tab Navigation Handler
+    const navItems = document.querySelectorAll('.nav-item');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    const pageTitle = document.getElementById('current-tab-title');
+
+    const tabTitles = {
+        'radar': 'Live BLE Radar & Sniffer',
+        'videos': 'Motion Videos & Correlated BLE Devices',
+        'devices': 'Device Inventory & Proximity Fingerprints',
+        'queries': 'Query Studio (20 Predefined Queries)',
+        'settings': 'Settings & System Configuration'
+    };
+
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const tab = item.getAttribute('data-tab');
+            navItems.forEach(i => i.classList.remove('active'));
+            tabPanes.forEach(p => {
+                p.classList.add('hidden');
+                p.classList.remove('active');
+            });
+
+            item.classList.add('active');
+            const targetPane = document.getElementById(`tab-${tab}`);
+            if (targetPane) {
+                targetPane.classList.remove('hidden');
+                targetPane.classList.add('active');
+            }
+            pageTitle.textContent = tabTitles[tab] || 'BLE OPSEC Sniffer';
+
+            if (tab === 'devices') loadDevices();
+            if (tab === 'videos') window.videoCorrelator.loadVideos();
+        });
+    });
+
+    // Device Search Input Listener
+    const searchInput = document.getElementById('device-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterDevicesTable(e.target.value.toLowerCase());
+        });
+    }
+
+    // OUI Update Button
+    const btnUpdateOui = document.getElementById('btn-update-oui');
+    const btnForceOui = document.getElementById('btn-force-oui');
+
+    const handleOuiUpdate = async () => {
+        alert("Downloading latest IEEE OUI vendor database...");
+        try {
+            const resp = await fetch('/api/oui/update', { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                alert(`Successfully updated OUI database with ${data.updated_vendors} vendor entries!`);
+            } else {
+                alert(`Update failed: ${data.error}`);
+            }
+        } catch (e) {
+            alert(`OUI update error: ${e.message}`);
+        }
+    };
+
+    if (btnUpdateOui) btnUpdateOui.addEventListener('click', handleOuiUpdate);
+    if (btnForceOui) btnForceOui.addEventListener('click', handleOuiUpdate);
+
+    // Setup WebSockets Live BLE Stream
+    setupWebSocket();
+
+    // Load initial devices list
+    loadDevices();
+});
 
 let totalPacketsCount = 0;
 const knownMacs = new Set();
@@ -236,8 +439,6 @@ function setupWebSocket() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}/ws`;
     const ws = new WebSocket(wsUrl);
-
-    const tbodyPackets = document.getElementById('tbody-packets');
 
     ws.onmessage = (event) => {
         try {
@@ -263,32 +464,11 @@ function setupWebSocket() {
                 window.radar.updateDevice(packet.mac_address, packet.rssi, packet.inferred_device_type);
             }
 
-            const catIcon = getCategoryIcon(packet.inferred_device_type);
-            const brandBadge = getBrandBadge(packet.vendor_name);
+            // Push packet to cached array
+            cachedPackets.unshift(packet);
+            if (cachedPackets.length > 100) cachedPackets.pop();
 
-            // Append row to Live Packet Feed table (keep max 20 rows)
-            const rowHtml = `
-                <tr class="hover:bg-slate-800/40 transition-colors cursor-pointer" onclick="window.deviceChart.showDeviceHistory('${packet.mac_address}', '${packet.local_name || packet.vendor_name}')">
-                    <td class="p-3.5 text-slate-300 font-mono text-[11px]">${formatLocalTimestamp(packet.timestamp)}</td>
-                    <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">${packet.adapter_name}</span></td>
-                    <td class="p-3.5 font-bold text-cyan-400 hover:underline">${packet.mac_address}</td>
-                    <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">${packet.address_type}</span></td>
-                    <td class="p-3.5"><span class="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold flex items-center gap-2 w-fit">${catIcon} <span>${packet.inferred_device_type}</span></span></td>
-                    <td class="p-3.5">${brandBadge}</td>
-                    <td class="p-3.5 font-bold text-cyan-400 flex items-center">${createRssiBargraphHtml(packet.rssi)} <span>${packet.rssi} dBm</span></td>
-                    <td class="p-3.5 text-slate-400 font-mono text-[11px]">${packet.local_name || 'N/A'}</td>
-                </tr>
-            `;
-
-            if (tbodyPackets.querySelector('.text-slate-500')) {
-                tbodyPackets.innerHTML = '';
-            }
-
-            tbodyPackets.insertAdjacentHTML('afterbegin', rowHtml);
-
-            if (tbodyPackets.children.length > 20) {
-                tbodyPackets.removeChild(tbodyPackets.lastChild);
-            }
+            renderPacketsFeed();
         } catch (e) {
             console.error("WS Packet parse error:", e);
         }
@@ -297,6 +477,37 @@ function setupWebSocket() {
     ws.onclose = () => {
         setTimeout(setupWebSocket, 3000);
     };
+}
+
+function renderPacketsFeed() {
+    const tbodyPackets = document.getElementById('tbody-packets');
+    if (!tbodyPackets) return;
+
+    const sorted = packetsSorter ? packetsSorter.sortData(cachedPackets) : cachedPackets;
+    const displayList = sorted.slice(0, 20);
+
+    if (displayList.length === 0) {
+        tbodyPackets.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">Listening for BLE advertisement packets...</td></tr>`;
+        return;
+    }
+
+    tbodyPackets.innerHTML = displayList.map(packet => {
+        const catIcon = getCategoryIcon(packet.inferred_device_type);
+        const brandBadge = getBrandBadge(packet.vendor_name);
+
+        return `
+            <tr class="hover:bg-slate-800/40 transition-colors cursor-pointer" onclick="window.deviceChart.showDeviceHistory('${packet.mac_address}', '${packet.local_name || packet.vendor_name}')">
+                <td class="p-3.5 text-slate-300 font-mono text-[11px]">${formatLocalTimestamp(packet.timestamp)}</td>
+                <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">${packet.adapter_name}</span></td>
+                <td class="p-3.5 font-bold text-cyan-400 hover:underline">${packet.mac_address}</td>
+                <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">${packet.address_type}</span></td>
+                <td class="p-3.5"><span class="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold flex items-center gap-2 w-fit">${catIcon} <span>${packet.inferred_device_type}</span></span></td>
+                <td class="p-3.5">${brandBadge}</td>
+                <td class="p-3.5 font-bold text-cyan-400 flex items-center">${createRssiBargraphHtml(packet.rssi)} <span>${packet.rssi} dBm</span></td>
+                <td class="p-3.5 text-slate-400 font-mono text-[11px]">${packet.local_name || 'N/A'}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 let cachedDevices = [];
@@ -316,12 +527,16 @@ async function loadDevices() {
 
 function renderDevicesTable(devices) {
     const tbody = document.getElementById('tbody-devices');
-    if (devices.length === 0) {
+    if (!tbody) return;
+
+    const sorted = devicesSorter ? devicesSorter.sortData(devices) : devices;
+
+    if (sorted.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">No devices logged yet.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = devices.map(d => {
+    tbody.innerHTML = sorted.map(d => {
         const catIcon = getCategoryIcon(d.inferred_type);
         const brandBadge = getBrandBadge(d.vendor_name);
 

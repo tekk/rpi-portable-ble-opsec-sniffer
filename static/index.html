@@ -140,17 +140,17 @@
                         <span class="text-xs text-slate-400">Click any MAC to inspect RSSI/Distance trend</span>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-96 overflow-y-auto">
-                        <table class="w-full text-left text-xs font-mono">
+                        <table class="w-full text-left text-xs font-mono" id="table-packets">
                             <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                                 <tr>
-                                    <th class="p-3.5">Timestamp</th>
-                                    <th class="p-3.5">Adapter</th>
-                                    <th class="p-3.5">MAC Address</th>
-                                    <th class="p-3.5">Type</th>
-                                    <th class="p-3.5">Inferred Device</th>
-                                    <th class="p-3.5">Vendor</th>
-                                    <th class="p-3.5">RSSI</th>
-                                    <th class="p-3.5">Raw Payload (EIR)</th>
+                                    <th class="p-3.5" data-sort-key="timestamp">Timestamp</th>
+                                    <th class="p-3.5" data-sort-key="adapter_name">Adapter</th>
+                                    <th class="p-3.5" data-sort-key="mac_address">MAC Address</th>
+                                    <th class="p-3.5" data-sort-key="address_type">Type</th>
+                                    <th class="p-3.5" data-sort-key="inferred_device_type">Inferred Device</th>
+                                    <th class="p-3.5" data-sort-key="vendor_name">Vendor</th>
+                                    <th class="p-3.5" data-sort-key="rssi">RSSI</th>
+                                    <th class="p-3.5" data-sort-key="local_name">Raw Payload (EIR)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800/50" id="tbody-packets">
@@ -223,15 +223,15 @@
                         <h3 class="font-bold text-base text-slate-100">Recorded Motion Events Gallery</h3>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-96 overflow-y-auto">
-                        <table class="w-full text-left text-xs font-mono">
+                        <table class="w-full text-left text-xs font-mono" id="table-videos">
                             <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                                 <tr>
-                                    <th class="p-3.5">Video File</th>
-                                    <th class="p-3.5">Motion Start</th>
-                                    <th class="p-3.5">Duration</th>
-                                    <th class="p-3.5">Trigger Score</th>
-                                    <th class="p-3.5">Correlated Devices</th>
-                                    <th class="p-3.5">Action</th>
+                                    <th class="p-3.5" data-sort-key="filename">Video File</th>
+                                    <th class="p-3.5" data-sort-key="start_time">Motion Start</th>
+                                    <th class="p-3.5" data-sort-key="duration_secs">Duration</th>
+                                    <th class="p-3.5" data-sort-key="trigger_score">Trigger Score</th>
+                                    <th class="p-3.5" data-sort-key="correlated_device_count">Correlated Devices</th>
+                                    <th class="p-3.5" data-sort-key="none">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800/50" id="tbody-videos">
@@ -253,18 +253,18 @@
                         <input type="text" id="device-search-input" placeholder="Search by MAC, Vendor, or Type..." class="bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 w-72">
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-[500px] overflow-y-auto">
-                        <table class="w-full text-left text-xs font-mono">
+                        <table class="w-full text-left text-xs font-mono" id="table-devices">
                             <thead class="bg-slate-950/90 text-slate-400 sticky top-0 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                                 <tr>
-                                    <th class="p-3.5">MAC Address</th>
-                                    <th class="p-3.5">Address Type</th>
-                                    <th class="p-3.5">Inferred Type</th>
-                                    <th class="p-3.5">Vendor Name</th>
-                                    <th class="p-3.5">Last Name</th>
-                                    <th class="p-3.5">Max RSSI</th>
-                                    <th class="p-3.5">Packets</th>
-                                    <th class="p-3.5">Last Seen</th>
-                                    <th class="p-3.5">Proximity Graph</th>
+                                    <th class="p-3.5" data-sort-key="mac_address">MAC Address</th>
+                                    <th class="p-3.5" data-sort-key="address_type">Address Type</th>
+                                    <th class="p-3.5" data-sort-key="inferred_type">Inferred Type</th>
+                                    <th class="p-3.5" data-sort-key="vendor_name">Vendor Name</th>
+                                    <th class="p-3.5" data-sort-key="last_adv_name">Last Name</th>
+                                    <th class="p-3.5" data-sort-key="max_rssi">Max RSSI</th>
+                                    <th class="p-3.5" data-sort-key="total_packets">Packets</th>
+                                    <th class="p-3.5" data-sort-key="last_seen">Last Seen</th>
+                                    <th class="p-3.5" data-sort-key="none">Proximity Graph</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-800/50" id="tbody-devices">

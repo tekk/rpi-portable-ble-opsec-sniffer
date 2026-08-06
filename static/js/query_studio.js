@@ -87,16 +87,68 @@ class QueryStudio {
     }
 
     renderResultsTable(rows) {
-        if (rows.length === 0) {
+        if (!rows || rows.length === 0) {
             this.theadEl.innerHTML = '';
             this.tbodyEl.innerHTML = `<tr><td class="p-6 text-center text-slate-500">Query executed successfully. 0 rows returned.</td></tr>`;
             return;
         }
 
+        this.currentRows = rows;
         const columns = Object.keys(rows[0]);
-        this.theadEl.innerHTML = `<tr>${columns.map(c => `<th class="p-3.5">${c}</th>`).join('')}</tr>`;
 
-        this.tbodyEl.innerHTML = rows.map(r => `
+        // Render Sortable Headers
+        this.theadEl.innerHTML = `
+            <tr>
+                ${columns.map(c => {
+                    let iconText = '↕';
+                    let iconClass = 'text-slate-600';
+                    let headerClass = 'text-slate-400';
+
+                    if (this.sortCol === c && this.sortDirection !== null) {
+                        headerClass = 'text-cyan-400 font-bold';
+                        if (this.sortDirection === 'asc') {
+                            iconText = '▲';
+                            iconClass = 'text-cyan-400 font-black';
+                        } else {
+                            iconText = '▼';
+                            iconClass = 'text-cyan-400 font-black';
+                        }
+                    }
+
+                    return `
+                        <th class="p-3.5 cursor-pointer select-none hover:text-cyan-400 transition-colors ${headerClass}" onclick="window.queryStudio.toggleSort('${c}')">
+                            <div class="flex items-center justify-between gap-1">
+                                <span>${c}</span>
+                                <span class="text-[10px] ${iconClass}">${iconText}</span>
+                            </div>
+                        </th>
+                    `;
+                }).join('')}
+            </tr>
+        `;
+
+        // Sort data rows if sort active
+        let displayRows = [...rows];
+        if (this.sortCol && this.sortDirection) {
+            const dir = this.sortDirection === 'asc' ? 1 : -1;
+            const col = this.sortCol;
+
+            displayRows.sort((a, b) => {
+                let valA = a[col];
+                let valB = b[col];
+                if (valA == null) valA = '';
+                if (valB == null) valB = '';
+
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return (valA - valB) * dir;
+                }
+                const strA = String(valA).toLowerCase();
+                const strB = String(valB).toLowerCase();
+                return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+            });
+        }
+
+        this.tbodyEl.innerHTML = displayRows.map(r => `
             <tr class="hover:bg-slate-800/40 transition-colors">
                 ${columns.map(c => {
                     const val = r[c];
@@ -116,6 +168,23 @@ class QueryStudio {
                 }).join('')}
             </tr>
         `).join('');
+    }
+
+    toggleSort(col) {
+        if (this.sortCol !== col) {
+            this.sortCol = col;
+            this.sortDirection = 'asc';
+        } else {
+            if (this.sortDirection === 'asc') {
+                this.sortDirection = 'desc';
+            } else if (this.sortDirection === 'desc') {
+                this.sortDirection = null;
+                this.sortCol = null;
+            } else {
+                this.sortDirection = 'asc';
+            }
+        }
+        this.renderResultsTable(this.currentRows);
     }
 }
 
