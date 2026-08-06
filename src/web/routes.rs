@@ -115,6 +115,8 @@ pub struct TestNasRequest {
     pub host: String,
     pub port: u16,
     pub username: String,
+    #[serde(default)]
+    pub password: Option<String>,
     pub remote_path: String,
 }
 

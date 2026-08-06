@@ -42,6 +42,7 @@ class StorageBackupManager {
         const hostEl = document.getElementById(isWizard ? 'wizard-nas-host' : 'nas-host-input');
         const portEl = document.getElementById(isWizard ? 'wizard-nas-port' : 'nas-port-input');
         const userEl = document.getElementById(isWizard ? 'wizard-nas-user' : 'nas-user-input');
+        const passEl = document.getElementById(isWizard ? 'wizard-nas-pass' : 'nas-pass-input');
         const pathEl = document.getElementById(isWizard ? 'wizard-nas-path' : 'nas-path-input');
 
         const resultContainer = document.getElementById(isWizard ? 'wizard-nas-test-result' : 'nas-test-result');
@@ -58,6 +59,7 @@ class StorageBackupManager {
             host: hostEl.value.trim(),
             port: parseInt(portEl ? portEl.value : '22') || 22,
             username: userEl ? userEl.value.trim() : 'nas_user',
+            password: passEl ? passEl.value : '',
             remote_path: pathEl ? pathEl.value.trim() : '/volume1/ble_backups'
         };
 
@@ -101,6 +103,7 @@ class StorageBackupManager {
         const host = document.getElementById('nas-host-input').value;
         const port = parseInt(document.getElementById('nas-port-input').value) || 22;
         const user = document.getElementById('nas-user-input').value;
+        const pass = document.getElementById('nas-pass-input') ? document.getElementById('nas-pass-input').value : '';
         const remotePath = document.getElementById('nas-path-input').value;
         const autoOffload = document.getElementById('nas-auto-offload').checked;
 
@@ -110,6 +113,7 @@ class StorageBackupManager {
             host,
             port,
             username: user,
+            password: pass,
             remote_path: remotePath,
             auto_backup_low_space: autoOffload,
             low_space_threshold_mb: 2000

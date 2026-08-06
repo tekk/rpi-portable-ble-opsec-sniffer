@@ -17,6 +17,8 @@ pub struct NasConfig {
     pub host: String,
     pub port: u16,
     pub username: String,
+    #[serde(default)]
+    pub password: String,
     pub remote_path: String,
     pub auto_backup_low_space: bool,
     pub low_space_threshold_mb: u64,
@@ -30,6 +32,7 @@ impl Default for NasConfig {
             host: "192.168.1.100".to_string(),
             port: 22,
             username: "nas_user".to_string(),
+            password: "".to_string(),
             remote_path: "/volume1/ble_opsec_backups".to_string(),
             auto_backup_low_space: true,
             low_space_threshold_mb: 2000, // 2GB

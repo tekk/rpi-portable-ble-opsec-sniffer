@@ -244,6 +244,7 @@ class SetupWizard {
         const nasHost = document.getElementById('wizard-nas-host')?.value || '';
         const nasPort = parseInt(document.getElementById('wizard-nas-port')?.value || '22');
         const nasUser = document.getElementById('wizard-nas-user')?.value || '';
+        const nasPass = document.getElementById('wizard-nas-pass')?.value || '';
         const nasPath = document.getElementById('wizard-nas-path')?.value || '';
         const nasAutoOffload = document.getElementById('wizard-nas-auto-offload')?.checked ?? true;
 
@@ -265,6 +266,7 @@ class SetupWizard {
                 host: nasHost,
                 port: nasPort,
                 username: nasUser,
+                password: nasPass,
                 remote_path: nasPath,
                 auto_backup_low_space: nasAutoOffload
             },
