@@ -210,7 +210,7 @@ pub async fn export_backup(
             "scope": scope,
             "exported_at": chrono::Utc::now().to_rfc3339(),
             "app": "RPi BLE OPSEC Sniffer",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "compression": "zstd-level-3"
         });
         let manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap_or_default();
