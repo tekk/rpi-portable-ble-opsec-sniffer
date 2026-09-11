@@ -2,7 +2,7 @@
 name = "rpi-portable-ble-opsec-sniffer"
 version = "1.1.0"
 edition = "2021"
-authors = ["Antigravity Developer <dev@antigravity.ai>"]
+authors = ["Tekk <tekk.sk@gmail.com>"]
 description = "Raspberry Pi 24/7 BLE Sniffer, Camera Motion Correlator & Remote Web UI"
 
 [dependencies]
