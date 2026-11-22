@@ -5,6 +5,8 @@ pub struct ParsedEir {
     pub service_uuids: Vec<String>,
     pub appearance: Option<u16>,
     pub tx_power: Option<i8>,
+    /// ASTM F3411 Remote ID broadcast (Service Data UUID 0xFFFA) decoded.
+    pub remote_id: bool,
 }
 
 pub fn parse_eir(raw: &[u8]) -> ParsedEir {
@@ -89,5 +91,25 @@ pub fn parse_eir(raw: &[u8]) -> ParsedEir {
         service_uuids,
         appearance,
         tx_power,
+        remote_id: remoteid::ble::find_in_advertising_data(raw).is_some_and(|r| r.frame().is_ok()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_remote_id_service_data() {
+        // Legacy BLE advert: Basic ID message, serial number, helicopter/multirotor.
+        let mut msg = [0u8; 25];
+        msg[0] = 0x02; // type 0 (Basic ID), protocol version 2
+        msg[1] = 0x12; // ID type 1 (serial), UA type 2
+        msg[2..12].copy_from_slice(b"1596F12345");
+        let mut adv = [0u8; 31];
+        let n = remoteid::ble::write_advertising_data(7, &msg, &mut adv).unwrap();
+
+        assert!(parse_eir(&adv[..n]).remote_id);
+        assert!(!parse_eir(&[0x02, 0x01, 0x06]).remote_id);
     }
 }

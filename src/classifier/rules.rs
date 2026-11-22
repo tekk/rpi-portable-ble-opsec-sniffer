@@ -93,6 +93,16 @@ pub fn infer_device_fingerprint(
         "Unknown Vendor".to_string()
     };
 
+    // ASTM F3411 Remote ID broadcast (Service Data 0xFFFA)
+    if eir.remote_id {
+        return FingerprintResult {
+            device_type: DeviceType::DroneUav,
+            vendor_name: vendor,
+            is_randomized_mac: is_random_mac,
+            fingerprint_confidence: "High (Remote ID Payload)",
+        };
+    }
+
     // =========================================================================
     // LAYER 1: Manufacturer Specific Data (0xFF) Deep Inspection (Bypasses RPA)
     // =========================================================================
