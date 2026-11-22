@@ -24,6 +24,7 @@ chrono = { version = "0.4", features = ["serde"] }
 bytes = "1.6"
 rand = "0.8"
 hex = "0.4"
+remoteid = "0.3.3"
 tar = "0.4"
 zstd = "0.13"
 
